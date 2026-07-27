@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Interactive Figure 13 — The rotating frame</title>
+<style>body{background:#F7F6F1;margin:0;padding:24px;display:flex;justify-content:center}</style>
+</head>
+<body>
+<!--FRAGMENT START-->
+<div class="plate" id="w13-plate">
+<style>
+#w13-plate{--paper:#F7F6F1;--ink:#21241F;--exc:#2E7D4F;--inh:#B3402A;--grid:#CFCCC0;--note:#2B4C7E;--gold:#C89B3C;
+  font-family:Georgia,'Times New Roman',serif;color:var(--ink);background:var(--paper);
+  border:1px solid var(--ink);max-width:860px;margin:0 auto}
+#w13-plate .hd{display:flex;align-items:baseline;gap:12px;border-bottom:1px solid var(--ink);padding:10px 16px}
+#w13-plate .eyebrow{font-family:ui-monospace,Menlo,monospace;font-size:11px;letter-spacing:.18em;color:var(--note)}
+#w13-plate .title{font-size:17px;font-style:italic}
+#w13-plate .body{display:flex;flex-wrap:wrap}
+#w13-plate .viz{flex:0 0 330px;padding:10px}
+#w13-plate .chart{flex:1 1 300px;min-width:280px;padding:10px 16px;border-left:1px dashed var(--grid)}
+#w13-plate svg{display:block;width:100%;height:auto}
+#w13-plate .ctl{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:6px 16px;
+  font-family:ui-monospace,Menlo,monospace;font-size:12px}
+#w13-plate input[type=range]{flex:1;min-width:150px;accent-color:#2B4C7E}
+#w13-plate label.tog{display:flex;align-items:center;gap:6px;cursor:pointer}
+#w13-plate .ro{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;min-height:40px;padding:2px 16px 8px;line-height:1.6}
+#w13-plate .ro .ok{color:var(--exc);font-weight:700}
+#w13-plate .ro .bad{color:var(--inh);font-weight:700}
+#w13-plate .cap{font-size:13px;line-height:1.5;padding:9px 16px 12px;border-top:1px dashed var(--grid);font-style:italic}
+@media (max-width:700px){#w13-plate .chart{border-left:none;border-top:1px dashed var(--grid)}}
+</style>
+<div class="hd"><span class="eyebrow">INTERACTIVE FIGURE 13</span><span class="title">The rotating frame — why layer-k probes die at layer k±4, and the one-map fix</span></div>
+<div class="body">
+  <div class="viz"><svg id="w13-svg" viewBox="0 0 330 300" role="img" aria-label="Feature direction rotating with depth"></svg></div>
+  <div class="chart"><svg id="w13-chart" viewBox="0 0 380 300" role="img" aria-label="Transfer R-squared vs depth"></svg></div>
+</div>
+<div class="ctl">
+  <span>depth (block)</span>
+  <input type="range" id="w13-b" min="0" max="9" value="0" aria-label="block">
+  <span id="w13-bv" style="min-width:2ch">0</span>
+  <label class="tog"><input type="checkbox" id="w13-align"> align first (transport the probe through the blind-fit map)</label>
+</div>
+<div class="ro" id="w13-ro"></div>
+<div class="cap">Schematic of the measured law, with the measured constants. The feature's information is present at every
+block (its length barely changes — R² stays ≥0.9 for a probe <i>refit</i> at each depth), but its direction turns
+~45° per block, so a probe frozen where it was fit reads a vanishing projection: naive transfer collapses within 2–3
+blocks and goes <i>negative</i> — worse than guessing the mean, because the probe now reads other features' coordinates.
+The alignment map is fit blind to the feature (one linear map per layer pair, unsupervised), yet transporting the probe
+through it holds the read at 96–99% of the refit ceiling across the entire stack — because all features ride one
+coherently drifting frame, and one map re-expresses the whole frame. Measured anchors: adjacent rotation 45.5° ± 8°,
+end-to-end cosine 0.04 (T70 material) and 0.055 (Qwen bracket depth), naive transfer R² ≈ −1, aligned +0.93/+0.96.</div>
+<script>
+(function(){
+const EXC='#2E7D4F', INH='#B3402A', INK='#21241F', NOTE='#2B4C7E', GRID='#CFCCC0', GOLD='#C89B3C';
+const ROT=45.5*Math.PI/180;      // measured mean rotation per block
+let seed=17; function rnd(){seed=(seed*1103515245+12345)%2147483648;return seed/2147483648;}
+const jit=[...Array(10)].map(()=>(rnd()-0.5)*10*Math.PI/180);  // ±5° jitter per block
+const angle=b=>{let a=0;for(let i=1;i<=b;i++)a+=ROT+jit[i];return a;}
+const persist=b=>0.99-0.008*b;    // feature R² refit at depth (0.99 -> ~0.92)
+function el(s,n,at){const e=document.createElementNS('http://www.w3.org/2000/svg',n);
+  for(const k in at)e.setAttribute(k,at[k]);s.appendChild(e);return e;}
+function lab(s,x,y,t,c,a,sz){const e=el(s,'text',{x,y,'font-size':sz||10.5,'font-family':'monospace',
+  fill:c||INK,'text-anchor':a||'start'});e.textContent=t;return e;}
+function drawViz(b,align){
+  const svg=document.getElementById('w13-svg');svg.innerHTML='';
+  const cx=165,cy=150,R=110;
+  el(svg,'circle',{cx,cy,r:R,fill:'#fff',stroke:GRID});
+  el(svg,'circle',{cx,cy,r:2,fill:INK});
+  // ghost trail of past directions
+  for(let i=0;i<=b;i++){const a=angle(i),len=R*persist(i);
+    el(svg,'line',{x1:cx,y1:cy,x2:cx+len*Math.cos(-a),y2:cy+len*Math.sin(-a),
+      stroke:EXC,'stroke-width':i===b?3.5:1.2,opacity:i===b?1:0.25});}
+  const a=angle(b),len=R*persist(b);
+  el(svg,'circle',{cx:cx+len*Math.cos(-a),cy:cy+len*Math.sin(-a),r:5,fill:EXC});
+  lab(svg,cx+ (len+14)*Math.cos(-a),cy+(len+14)*Math.sin(-a)+3,'feature @ b'+b,EXC,'middle');
+  // probe: frozen at 0, or co-rotated if aligned
+  const pa=align?a:0;
+  el(svg,'line',{x1:cx,y1:cy,x2:cx+R*Math.cos(-pa),y2:cy+R*Math.sin(-pa),
+    stroke:NOTE,'stroke-width':2.5,'stroke-dasharray':'7 4'});
+  lab(svg,cx+(R+14)*Math.cos(-pa),cy+(R+14)*Math.sin(-pa)+3,
+    align?'probe (aligned)':'probe (fit @ b0)',NOTE,'middle');
+  // angle arc between probe and feature
+  if(!align&&b>0){
+    const steps=24,r0=42;let d='';
+    for(let k=0;k<=steps;k++){const t=-a*k/steps;
+      d+=(k?'L':'M')+(cx+r0*Math.cos(t))+','+(cy+r0*Math.sin(t));}
+    el(svg,'path',{d,fill:'none',stroke:INH,'stroke-width':1.6});
+    lab(svg,cx+55,cy-28,Math.round(a*180/Math.PI)+'°',INH);
+  }
+  lab(svg,165,290,'one 2-D slice of the stream; length = decodable signal','#8a877c','middle',9.5);
+}
+function series(align){
+  return [...Array(10)].map((_,b)=>{
+    const p=persist(b);
+    if(align)return p*(0.97+0.02*rnd()*0);           // 96-99% of ceiling
+    const c=Math.cos(angle(b));
+    return Math.max(-1.2, p*c*Math.abs(c) - 0.12*(1-Math.abs(c)));  // signed collapse -> negative
+  });
+}
+function drawChart(b,align){
+  const svg=document.getElementById('w13-chart');svg.innerHTML='';
+  const X0=46,X1=364,Y0=16,Y1=270;
+  const xs=i=>X0+i/9*(X1-X0), ys=v=>Y0+(1-(v+1.2)/2.4)*(Y1-Y0);
+  el(svg,'rect',{x:X0,y:Y0,width:X1-X0,height:Y1-Y0,fill:'#fff',stroke:GRID});
+  [[1,'+1'],[0.5,''],[0,'0'],[-0.5,''],[-1,'−1']].forEach(([v,l])=>{
+    el(svg,'line',{x1:X0,y1:ys(v),x2:X1,y2:ys(v),stroke:v===0?'#B9B6AA':GRID,'stroke-width':v===0?1.2:0.6});
+    if(l)lab(svg,X0-5,ys(v)+3,l,'#8a877c','end');});
+  for(let i=0;i<10;i++)lab(svg,xs(i),Y1+13,'b'+i,'#8a877c','middle',9.5);
+  lab(svg,X0+4,Y0+12,'probe transfer R² (fit at b0, applied at depth)','#8a877c');
+  // ceiling
+  let dC='';[...Array(10)].forEach((_,i)=>{dC+=(i?'L':'M')+xs(i)+','+ys(persist(i));});
+  el(svg,'path',{d:dC,fill:'none',stroke:GRID,'stroke-width':1.6,'stroke-dasharray':'3 4'});
+  lab(svg,X1-4,ys(persist(9))-6,'refit ceiling','#8a877c','end');
+  // both curves faint, active bold
+  [['naive',false,INH],['aligned',true,EXC]].forEach(([name,al,color])=>{
+    const s=series(al);let d='';
+    s.forEach((v,i)=>{d+=(i?'L':'M')+xs(i)+','+ys(v);});
+    const active=(al===align);
+    el(svg,'path',{d,fill:'none',stroke:color,'stroke-width':active?2.6:1.2,opacity:active?1:0.3});
+    s.forEach((v,i)=>el(svg,'circle',{cx:xs(i),cy:ys(v),r:i===b&&active?6:(active?3:1.8),
+      fill:active?color:'#fff',stroke:color,'stroke-width':1.5,opacity:active?1:0.35}));
+    lab(svg,X1-4,ys(s[9])+(al?-8:14),name,color,'end');
+  });
+}
+function update(){
+  const b=+document.getElementById('w13-b').value;
+  const align=document.getElementById('w13-align').checked;
+  document.getElementById('w13-bv').textContent=b;
+  drawViz(b,align);drawChart(b,align);
+  const s=series(align)[b], a=Math.round(angle(b)*180/Math.PI);
+  document.getElementById('w13-ro').innerHTML= align
+    ?`block ${b}: probe transported through the blind-fit map — reads at <span class="ok">R² ≈ ${s.toFixed(2)}</span> (96–99% of the refit ceiling), all the way down the stack. One unsupervised map, every feature.`
+    :(b===0?`block 0: the probe is where it was fit — R² ${s.toFixed(2)}. Now drag right.`
+      :b<3?`block ${b}: the frame has turned ${a}° — the frozen probe reads a shrinking projection: <span class="bad">R² ${s.toFixed(2)}</span>, though a probe <i>refit here</i> would score ${persist(b).toFixed(2)}. Flat refit-R² curves hide all of this.`
+      :`block ${b}: ${a}° of accumulated rotation — the probe now reads <span class="bad">other coordinates</span>: R² ${s.toFixed(2)}${s<0?' — worse than predicting the mean':''}. The feature is still right there (refit ceiling ${persist(b).toFixed(2)}). Tick “align first.”`);
+}
+document.getElementById('w13-b').addEventListener('input',update);
+document.getElementById('w13-align').addEventListener('change',update);
+update();
+})();
+</script>
+</div>
+<!--FRAGMENT END-->
+</body>
+</html>

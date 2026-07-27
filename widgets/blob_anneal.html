@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Interactive Figure 2 — The blob move, annealing live</title>
+<style>body{background:#F7F6F1;margin:0;padding:24px;display:flex;justify-content:center}</style>
+</head>
+<body>
+<!--FRAGMENT START-->
+<div class="plate" id="w2-plate">
+<style>
+#w2-plate{--paper:#F7F6F1;--ink:#21241F;--exc:#2E7D4F;--inh:#B3402A;--grid:#CFCCC0;--note:#2B4C7E;
+  font-family:Georgia,'Times New Roman',serif;color:var(--ink);background:var(--paper);
+  border:1px solid var(--ink);max-width:860px;margin:0 auto}
+#w2-plate .hd{display:flex;align-items:baseline;gap:12px;border-bottom:1px solid var(--ink);padding:10px 16px}
+#w2-plate .eyebrow{font-family:ui-monospace,Menlo,monospace;font-size:11px;letter-spacing:.18em;color:var(--note)}
+#w2-plate .title{font-size:17px;font-style:italic}
+#w2-plate .body{display:flex;flex-wrap:wrap;gap:0}
+#w2-plate .cv{padding:14px;flex:0 0 auto}
+#w2-plate canvas.field{border:1px solid var(--ink);image-rendering:pixelated;display:block}
+#w2-plate .side{flex:1 1 260px;min-width:250px;padding:14px 16px;border-left:1px dashed var(--grid);
+  font-family:ui-monospace,Menlo,monospace;font-size:12px}
+#w2-plate .row{display:flex;justify-content:space-between;margin:3px 0}
+#w2-plate .row .v{font-weight:700}
+#w2-plate .lbl{font-size:10.5px;letter-spacing:.1em;color:#8a877c;margin:12px 0 3px}
+#w2-plate .sched{position:relative;height:34px;border:1px solid var(--grid);background:#fff}
+#w2-plate .bar2{display:flex;align-items:center;gap:12px;border-top:1px solid var(--ink);padding:9px 16px;flex-wrap:wrap}
+#w2-plate button{font-family:ui-monospace,Menlo,monospace;font-size:12px;background:var(--paper);color:var(--ink);
+  border:1px solid var(--ink);padding:5px 14px;cursor:pointer}
+#w2-plate button:hover{background:var(--ink);color:var(--paper)}
+#w2-plate button:focus-visible{outline:2px solid var(--note);outline-offset:2px}
+#w2-plate button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+#w2-plate .cap{font-size:13px;line-height:1.5;padding:9px 16px 12px;border-top:1px dashed var(--grid);font-style:italic}
+#w2-plate .done{color:var(--exc);font-weight:700;display:none}
+@media (max-width:720px){#w2-plate .side{border-left:none;border-top:1px dashed var(--grid)}}
+</style>
+<div class="hd"><span class="eyebrow">INTERACTIVE FIGURE 2</span><span class="title">The blob move, annealing live</span></div>
+<div class="body">
+  <div class="cv">
+    <canvas class="field" id="w2-field" width="280" height="280" aria-label="28 by 28 receptive field heatmap"></canvas>
+    <div style="font-family:ui-monospace,Menlo,monospace;font-size:11px;margin-top:6px">
+      one P-row: 784 weights, Σ = 1.000 at every step
+    </div>
+  </div>
+  <div class="side">
+    <div class="row"><span>proposals</span><span class="v" id="w2-step">0</span></div>
+    <div class="row"><span>blob radius</span><span class="v" id="w2-rad">6.0 px</span></div>
+    <div class="row"><span>temperature</span><span class="v" id="w2-temp">—</span></div>
+    <div class="row"><span>accept rate (last 200)</span><span class="v" id="w2-acc">—</span></div>
+    <div class="row"><span>score (template match)</span><span class="v" id="w2-score">—</span></div>
+    <div class="row"><span class="done" id="w2-done">annealed ✓</span><span></span></div>
+    <div class="lbl">SCORE</div>
+    <canvas id="w2-spark" width="240" height="46" style="width:100%;height:46px;border:1px solid var(--grid);background:#fff"></canvas>
+    <div class="lbl">RADIUS SCHEDULE · 6 px → 0.8 px</div>
+    <div class="sched"><canvas id="w2-schedc" width="240" height="34" style="width:100%;height:34px;display:block"></canvas></div>
+  </div>
+</div>
+<div class="bar2">
+  <button id="w2-play" aria-pressed="true">Pause</button>
+  <button id="w2-reset">Reset</button>
+  <button id="w2-fast" aria-pressed="false">Fast ×8</button>
+  <span style="font-family:ui-monospace,Menlo,monospace;font-size:11px">
+    ring = latest proposal · <b style="color:#2E7D4F">green</b> accepted · <b style="color:#B3402A">rust</b> rejected</span>
+</div>
+<div class="cap">A single first-layer receptive field, trained by nothing but blob proposals under Boltzmann acceptance
+(the objective here is a fixed digit template, standing in for "classification improved"). The move: pick a center,
+multiply the weights under a Gaussian blob by (1 + a·G), renormalize the row — the simplex is never left. Early, wide
+blobs at high temperature rough in mass and accept freely; late, sub-pixel blobs at low temperature sharpen strokes and
+mostly get rejected. Coarse-to-fine, exploration-to-exploitation, one schedule.</div>
+<script>
+(function(){
+const S=28, PX=10, TOTAL=6000, R0=6, R1=0.8, T0=0.020, T1=0.0004;
+const cvs=document.getElementById('w2-field'), ctx=cvs.getContext('2d');
+const spark=document.getElementById('w2-spark'), sctx=spark.getContext('2d');
+const schedc=document.getElementById('w2-schedc'), kctx=schedc.getContext('2d');
+let w,target,step,hist,accWin,playing=true,fast=false,rings=[];
+function makeTarget(){
+  const o=document.createElement('canvas');o.width=S;o.height=S;const c=o.getContext('2d');
+  c.fillStyle='#000';c.fillRect(0,0,S,S);c.fillStyle='#fff';
+  c.font='bold 26px Georgia';c.textAlign='center';c.textBaseline='middle';
+  c.fillText('3',S/2,S/2+1);
+  const d=c.getImageData(0,0,S,S).data,t=new Float32Array(S*S);
+  for(let i=0;i<S*S;i++)t[i]=d[i*4]/255;
+  // mild blur so gradients aren't knife-edged
+  const b=new Float32Array(S*S);
+  for(let y=0;y<S;y++)for(let x=0;x<S;x++){let s=0,n=0;
+    for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){const yy=y+dy,xx=x+dx;
+      if(yy>=0&&yy<S&&xx>=0&&xx<S){s+=t[yy*S+xx];n++;}}b[y*S+x]=s/n;}
+  let norm=Math.hypot(...b); for(let i=0;i<S*S;i++)b[i]/=norm;
+  return b;
+}
+function score(){let d=0,n=0;for(let i=0;i<S*S;i++){d+=w[i]*target[i];n+=w[i]*w[i];}
+  return d/Math.sqrt(n);}
+function reset(){
+  w=new Float32Array(S*S);let s=0;
+  for(let i=0;i<S*S;i++){w[i]=1+0.35*Math.random();s+=w[i];}
+  for(let i=0;i<S*S;i++)w[i]/=s;
+  step=0;hist=[];accWin=[];rings=[];
+  document.getElementById('w2-done').style.display='none';
+  drawSched();draw();updateUI(score());
+}
+function propose(){
+  const frac=step/TOTAL;
+  const r=R0*Math.pow(R1/R0,frac), T=T0*Math.pow(T1/T0,frac);
+  const cx=Math.random()*S, cy=Math.random()*S, a=(Math.random()*2-1)*0.8;
+  const s0=score(), r2=2*r*r, lo=Math.max(0,Math.floor(cy-3*r)), hi=Math.min(S-1,Math.ceil(cy+3*r));
+  const old=[];
+  for(let y=lo;y<=hi;y++)for(let x=Math.max(0,Math.floor(cx-3*r));x<=Math.min(S-1,Math.ceil(cx+3*r));x++){
+    const i=y*S+x, g=Math.exp(-((x-cx)*(x-cx)+(y-cy)*(y-cy))/r2);
+    if(g>0.01){old.push([i,w[i]]); w[i]=Math.max(1e-9,w[i]*(1+a*g));}}
+  let s=0;for(let i=0;i<S*S;i++)s+=w[i];
+  const inv=1/s;for(let i=0;i<S*S;i++)w[i]*=inv;      // renormalize: still on the simplex
+  const s1=score(), d=s1-s0;
+  const accept=d>0||Math.random()<Math.exp(d/T);
+  if(!accept){for(const[i,v]of old)w[i]=v;
+    let s2=0;for(let i=0;i<S*S;i++)s2+=w[i];const inv2=1/s2;for(let i=0;i<S*S;i++)w[i]*=inv2;}
+  accWin.push(accept?1:0); if(accWin.length>200)accWin.shift();
+  step++;
+  return {cx,cy,r,accept,sc:accept?s1:s0,T};
+}
+function draw(){
+  const mx=Math.max(...w);
+  for(let y=0;y<S;y++)for(let x=0;x<S;x++){
+    const v=w[y*S+x]/mx;
+    // paper -> deep green ramp
+    const rr=Math.round(247-(247-27)*v), gg=Math.round(246-(246-94)*v), bb=Math.round(241-(241-56)*v);
+    ctx.fillStyle=`rgb(${rr},${gg},${bb})`;ctx.fillRect(x*PX,y*PX,PX,PX);}
+  rings=rings.filter(r=>r.age<14);
+  for(const r of rings){
+    ctx.beginPath();ctx.arc(r.cx*PX,r.cy*PX,Math.max(2,r.r*PX),0,7);
+    ctx.strokeStyle=r.accept?`rgba(46,125,79,${1-r.age/14})`:`rgba(179,64,42,${1-r.age/14})`;
+    ctx.lineWidth=2;ctx.stroke();r.age++;}
+}
+function drawSpark(){
+  sctx.fillStyle='#fff';sctx.fillRect(0,0,240,46);
+  if(hist.length<2)return;
+  const mn=Math.min(...hist),mxv=Math.max(...hist),rg=(mxv-mn)||1;
+  sctx.beginPath();
+  hist.forEach((v,i)=>{const x=i/(hist.length-1)*238+1,y=43-(v-mn)/rg*40;
+    i?sctx.lineTo(x,y):sctx.moveTo(x,y);});
+  sctx.strokeStyle='#2E7D4F';sctx.lineWidth=1.6;sctx.stroke();
+}
+function drawSched(){
+  kctx.fillStyle='#fff';kctx.fillRect(0,0,240,34);
+  kctx.beginPath();
+  for(let x=0;x<=238;x++){const f=x/238,r=R0*Math.pow(R1/R0,f);
+    const y=31-(r/R0)*28; x?kctx.lineTo(x+1,y):kctx.moveTo(1,y);}
+  kctx.strokeStyle='#2B4C7E';kctx.lineWidth=1.4;kctx.stroke();
+  const f=Math.min(1,step/TOTAL),x=1+f*238,r=R0*Math.pow(R1/R0,f),y=31-(r/R0)*28;
+  kctx.beginPath();kctx.arc(x,y,3.4,0,7);kctx.fillStyle='#21241F';kctx.fill();
+}
+function updateUI(sc,T){
+  document.getElementById('w2-step').textContent=step;
+  const frac=Math.min(1,step/TOTAL);
+  document.getElementById('w2-rad').textContent=(R0*Math.pow(R1/R0,frac)).toFixed(2)+' px';
+  document.getElementById('w2-temp').textContent=(T??T0*Math.pow(T1/T0,frac)).toExponential(1);
+  document.getElementById('w2-acc').textContent=accWin.length?
+     Math.round(100*accWin.reduce((a,b)=>a+b,0)/accWin.length)+'%':'—';
+  document.getElementById('w2-score').textContent=sc.toFixed(4);
+}
+function frame(){
+  if(playing&&step<TOTAL){
+    const n=fast?240:30;let last;
+    for(let k=0;k<n&&step<TOTAL;k++){last=propose();
+      if(k===n-1||step===TOTAL)rings.push({cx:last.cx,cy:last.cy,r:last.r,accept:last.accept,age:0});}
+    hist.push(last.sc); if(hist.length>240)hist.shift();
+    draw();drawSpark();drawSched();updateUI(last.sc,last.T);
+    if(step>=TOTAL){document.getElementById('w2-done').style.display='inline';
+      document.getElementById('w2-play').textContent='Play';playing=false;}
+  } else if(rings.length){draw();}
+  requestAnimationFrame(frame);
+}
+document.getElementById('w2-play').addEventListener('click',e=>{
+  if(step>=TOTAL)return;
+  playing=!playing;e.target.textContent=playing?'Pause':'Play';
+  e.target.setAttribute('aria-pressed',playing);});
+document.getElementById('w2-reset').addEventListener('click',()=>{reset();
+  playing=true;document.getElementById('w2-play').textContent='Pause';});
+document.getElementById('w2-fast').addEventListener('click',e=>{fast=!fast;
+  e.target.setAttribute('aria-pressed',fast);});
+target=makeTarget();reset();
+if(matchMedia('(prefers-reduced-motion: reduce)').matches){playing=false;
+  document.getElementById('w2-play').textContent='Play';
+  for(let k=0;k<2500;k++)propose();draw();drawSched();updateUI(score());}
+requestAnimationFrame(frame);
+})();
+</script>
+</div>
+<!--FRAGMENT END-->
+</body>
+</html>

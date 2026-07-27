@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Interactive Figure 9 — Stack vs bag</title>
+<style>body{background:#F7F6F1;margin:0;padding:24px;display:flex;justify-content:center}</style>
+</head>
+<body>
+<!--FRAGMENT START-->
+<div class="plate" id="w9-plate">
+<style>
+#w9-plate{--paper:#F7F6F1;--ink:#21241F;--exc:#2E7D4F;--inh:#B3402A;--grid:#CFCCC0;--note:#2B4C7E;--gold:#C89B3C;
+  font-family:Georgia,'Times New Roman',serif;color:var(--ink);background:var(--paper);
+  border:1px solid var(--ink);max-width:860px;margin:0 auto}
+#w9-plate .hd{display:flex;align-items:baseline;gap:12px;border-bottom:1px solid var(--ink);padding:10px 16px}
+#w9-plate .eyebrow{font-family:ui-monospace,Menlo,monospace;font-size:11px;letter-spacing:.18em;color:var(--note)}
+#w9-plate .title{font-size:17px;font-style:italic}
+#w9-plate .ctl{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:12px 16px 6px;
+  font-family:ui-monospace,Menlo,monospace;font-size:13px}
+#w9-plate button{font-family:ui-monospace,Menlo,monospace;font-size:13px;background:var(--paper);color:var(--ink);
+  border:1px solid var(--ink);padding:5px 12px;cursor:pointer}
+#w9-plate button:hover:not(:disabled){background:var(--ink);color:var(--paper)}
+#w9-plate button:disabled{opacity:.35;cursor:default}
+#w9-plate button:focus-visible{outline:2px solid var(--note);outline-offset:2px}
+#w9-plate .prefix{font-family:ui-monospace,Menlo,monospace;font-size:20px;letter-spacing:2px;min-height:30px;
+  padding:6px 16px;border-bottom:1px dashed var(--grid)}
+#w9-plate .cols{display:flex;flex-wrap:wrap}
+#w9-plate .col{padding:12px 16px;min-width:150px;flex:1 1 150px}
+#w9-plate .col h4{font-family:ui-monospace,Menlo,monospace;font-size:11px;font-weight:700;letter-spacing:.1em;
+  margin:0 0 8px;color:#8a877c}
+#w9-plate .stackbox{display:flex;flex-direction:column-reverse;gap:3px;min-height:130px;justify-content:flex-start}
+#w9-plate .cell{font-family:ui-monospace,Menlo,monospace;font-size:15px;border:1.5px solid var(--ink);
+  width:44px;text-align:center;padding:3px 0;background:#fff}
+#w9-plate .cell.top{border-color:var(--exc);border-width:2.5px;font-weight:700}
+#w9-plate .tally{font-family:ui-monospace,Menlo,monospace;font-size:13px;margin:6px 0}
+#w9-plate .bar{height:14px;background:var(--note);display:inline-block;vertical-align:middle;margin-left:6px}
+#w9-plate .reader{font-family:ui-monospace,Menlo,monospace;font-size:13px;line-height:2}
+#w9-plate .reader .v{display:inline-block;min-width:26px;text-align:center;border:1.5px solid var(--ink);
+  padding:1px 6px;background:#fff;font-weight:700}
+#w9-plate .lamp{display:inline-block;padding:3px 10px;border:1.5px solid;font-weight:700;font-size:12px}
+#w9-plate .lamp.on{border-color:var(--inh);color:var(--inh);background:#F7E9E5}
+#w9-plate .lamp.off{border-color:var(--grid);color:#8a877c}
+#w9-plate .mode{display:flex;border:1px solid var(--ink);width:fit-content;margin:4px 0}
+#w9-plate .mode button{border:none;border-right:1px solid var(--ink)}
+#w9-plate .mode button:last-child{border-right:none}
+#w9-plate .mode button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+#w9-plate .verdict{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;padding:6px 16px 10px;min-height:38px}
+#w9-plate .verdict b.bad{color:var(--inh)}
+#w9-plate .verdict b.ok{color:var(--exc)}
+#w9-plate .cap{font-size:13px;line-height:1.5;padding:9px 16px 12px;border-top:1px dashed var(--grid);font-style:italic}
+</style>
+<div class="hd"><span class="eyebrow">INTERACTIVE FIGURE 9</span><span class="title">Stack vs bag — three readers, one prefix</span></div>
+<div class="ctl">
+  <span>build:</span>
+  <button id="w9-po">push (</button>
+  <button id="w9-ps">push [</button>
+  <button id="w9-pop">pop (close top)</button>
+  <button id="w9-bs">⌫</button>
+  <button id="w9-clr">clear</button>
+  <button id="w9-rand">random conflict prefix ⚡</button>
+</div>
+<div class="prefix" id="w9-prefix">·</div>
+<div class="cols">
+  <div class="col">
+    <h4>THE TRUE STACK (ordered)</h4>
+    <div class="stackbox" id="w9-stack"></div>
+  </div>
+  <div class="col">
+    <h4>THE BAG (owed closers, no order)</h4>
+    <div class="tally">) owed: <span id="w9-nr">0</span><span class="bar" id="w9-br"></span></div>
+    <div class="tally">] owed: <span id="w9-ns">0</span><span class="bar" id="w9-bs2"></span></div>
+    <div style="margin-top:14px"><span class="lamp off" id="w9-lamp">no conflict</span></div>
+  </div>
+  <div class="col">
+    <h4>THREE READERS SAY: CLOSE…</h4>
+    <div class="reader">
+      stack reader (top): <span class="v" id="w9-r1">—</span><br>
+      bag reader (majority): <span class="v" id="w9-r2">—</span><br>
+      the model: <span class="v" id="w9-r3">—</span>
+    </div>
+    <div class="mode">
+      <button id="w9-pre" aria-pressed="true">pre-finetune</button>
+      <button id="w9-post" aria-pressed="false">post-finetune</button>
+    </div>
+  </div>
+</div>
+<div class="verdict" id="w9-verdict"></div>
+<div class="cap">Push brackets, pop them, or generate a conflict. The <b>stack reader</b> answers with the true top;
+the <b>bag reader</b> sums owed closers with no order and answers with the majority (leaning ] on ties — the fitted
+intercept). The <b>model</b> row applies the fitted readout, gap ≈ −2.33 + 0.77·top + 3.53·bag pre-finetune, −0.17 +
+6.00·top + 1.34·bag after (a schematic operationalization: top = ±1 by identity, bag = the owed-closer imbalance). The
+conflict lamp marks prefixes where the top disagrees with a strict majority (ties have no majority and are not
+conflicts). On decisive majorities the pre-finetune model visibly sides with the bag against its own stack; on thin
+majorities the terms nearly cancel — and that near-cancellation, not decisive wrongness, is why measured conflict
+accuracy is exact chance (0.47–0.50 at depths 3–6). Post-finetune, the same prefixes read correctly at 0.93.</div>
+<script>
+(function(){
+const EXC='#2E7D4F', INH='#B3402A';
+let stack=[], prefix='', mode='pre';
+let seed=5; function rnd(){seed=(seed*1103515245+12345)%2147483648;return seed/2147483648;}
+const closer=o=>o==='('?')':']';
+function push(o){if(stack.length>=8)return;stack.push(o);prefix+=o;render();}
+function pop(){if(!stack.length)return;prefix+=closer(stack.pop());render();}
+function back(){if(!prefix)return;const c=prefix[prefix.length-1];prefix=prefix.slice(0,-1);
+  if(c==='('||c==='[')stack.pop();else stack.push(c===')'?'(':'[');render();}
+function clear(){stack=[];prefix='';render();}
+function randomConflict(){
+  for(let tries=0;tries<200;tries++){
+    stack=[];prefix='';
+    const n=3+Math.floor(rnd()*4);
+    for(let i=0;i<n;i++){
+      if(stack.length&&rnd()<0.25)pop0();else push0(rnd()<0.6?'(':'[');}
+    // ensure depth>=3 and a strict-majority conflict
+    while(stack.length<3)push0(rnd()<0.6?'(':'[');
+    const{top,maj,nr,ns}=readers();
+    if(maj&&top!==maj&&Math.abs(nr-ns)>=2)break;   // decisive majority: the bag clearly wins
+    if(maj&&top!==maj&&tries>120)break;            // fall back to thin conflicts if unlucky
+  }
+  render();
+  function push0(o){stack.push(o);prefix+=o;}
+  function pop0(){prefix+=closer(stack.pop());}
+}
+function readers(){
+  const owed=stack.map(closer);
+  const nr=owed.filter(c=>c===')').length, ns=owed.filter(c=>c===']').length;
+  const top=stack.length?closer(stack[stack.length-1]):null;
+  const maj=nr===ns?null:(nr>ns?')':']');   // strict majority only; tie = no majority
+  // model: gap>0 predicts ']'
+  const tt=top===']'?1:top===')'?-1:0;
+  const b=(nr+ns)?(ns-nr)/(nr+ns):0;
+  const co=mode==='pre'?{lean:0.30,t:0.77,b:3.53}:{lean:0.02,t:6.0,b:1.34};
+  const termT=co.t*tt, termB=co.b*b;
+  const gap=co.lean+termT+termB;
+  const model=stack.length?(gap>=0?']':')'):null;
+  return{nr,ns,top,maj,model,gap,termT,termB,lean:co.lean};
+}
+function render(){
+  document.getElementById('w9-prefix').textContent=prefix||'·';
+  const sb=document.getElementById('w9-stack');sb.innerHTML='';
+  stack.forEach((o,i)=>{const d=document.createElement('div');
+    d.className='cell'+(i===stack.length-1?' top':'');
+    d.textContent=o+' → owe '+closer(o);
+    d.style.width='110px';
+    sb.appendChild(d);});
+  if(stack.length){const t=document.createElement('div');
+    t.style.cssText='font-family:monospace;font-size:10px;color:#8a877c';
+    t.textContent='↑ top';sb.appendChild(t);}
+  const{nr,ns,top,maj,model,gap,termT,termB,lean}=readers();
+  document.getElementById('w9-nr').textContent=nr;
+  document.getElementById('w9-ns').textContent=ns;
+  document.getElementById('w9-br').style.width=(nr*22)+'px';
+  document.getElementById('w9-bs2').style.width=(ns*22)+'px';
+  const set=(id,v,c)=>{const e=document.getElementById(id);e.textContent=v||'—';
+    e.style.borderColor=c||'#21241F';e.style.color=c||'#21241F';};
+  set('w9-r1',top,EXC);
+  set('w9-r2',maj?maj:(stack.length?'tie':null));
+  const conflict=top&&maj&&top!==maj;
+  set('w9-r3',model?`${model}  (gap ${gap>=0?'+':''}${gap.toFixed(2)})`:null,
+      model?(model===top?EXC:INH):null);
+  const lamp=document.getElementById('w9-lamp');
+  lamp.className='lamp '+(conflict?'on':'off');
+  lamp.textContent=conflict?'CONFLICT: top ≠ majority':(maj?'no conflict':(stack.length?'tie — no majority':'no conflict'));
+  const v=document.getElementById('w9-verdict');
+  const terms=`bag term ${termB>=0?'+':''}${termB.toFixed(2)} · top term ${termT>=0?'+':''}${termT.toFixed(2)} · ]-lean +${lean.toFixed(2)}`;
+  if(!stack.length){v.innerHTML='empty stack — push something.';}
+  else if(conflict&&mode==='pre'){
+    v.innerHTML= model===maj
+      ?`${terms} — the bag dominates (3.53 vs 0.77): the model answers with the <b class="bad">majority</b>, against its own stack.`
+      :`${terms} — the majority is thin enough that the top's whisper + ]-lean nearly cancel it. <b class="bad">This near-cancellation is exactly why measured conflict accuracy is chance</b> (0.47–0.50 at depths 3–6): on conflicts the readout is torn, not decisively wrong.`;
+  } else if(conflict){
+    v.innerHTML=`${terms} — with the coefficients traded (top 6.00 vs bag 1.34) the model reads its <b class="ok">own stack</b>; measured conflict accuracy after the ~100k-token elicitation: <b class="ok">0.93</b>.`;
+  } else if(!maj){
+    v.innerHTML=`${terms} — a tie has no majority; the intercept's small ]-lean loses to even the top's whisper (0.77), so both models follow the top here. Ties are not conflicts.`;
+  } else {
+    v.innerHTML=`top and majority agree — every reader answers <b>${top}</b>; this is the on-distribution regime where the bag was always good enough (0.76–0.95).`;
+  }
+}
+document.getElementById('w9-po').addEventListener('click',()=>push('('));
+document.getElementById('w9-ps').addEventListener('click',()=>push('['));
+document.getElementById('w9-pop').addEventListener('click',pop);
+document.getElementById('w9-bs').addEventListener('click',back);
+document.getElementById('w9-clr').addEventListener('click',clear);
+document.getElementById('w9-rand').addEventListener('click',randomConflict);
+document.getElementById('w9-pre').addEventListener('click',()=>{mode='pre';
+  document.getElementById('w9-pre').setAttribute('aria-pressed',true);
+  document.getElementById('w9-post').setAttribute('aria-pressed',false);render();});
+document.getElementById('w9-post').addEventListener('click',()=>{mode='post';
+  document.getElementById('w9-pre').setAttribute('aria-pressed',false);
+  document.getElementById('w9-post').setAttribute('aria-pressed',true);render();});
+randomConflict();
+})();
+</script>
+</div>
+<!--FRAGMENT END-->
+</body>
+</html>

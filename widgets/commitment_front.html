@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Interactive Figure 14 — The wall and the gradient</title>
+<style>body{background:#F7F6F1;margin:0;padding:24px;display:flex;justify-content:center}</style>
+</head>
+<body>
+<!--FRAGMENT START-->
+<div class="plate" id="w14-plate">
+<style>
+#w14-plate{--paper:#F7F6F1;--ink:#21241F;--exc:#2E7D4F;--inh:#B3402A;--grid:#CFCCC0;--note:#2B4C7E;--gold:#C89B3C;
+  font-family:Georgia,'Times New Roman',serif;color:var(--ink);background:var(--paper);
+  border:1px solid var(--ink);max-width:860px;margin:0 auto}
+#w14-plate .hd{display:flex;align-items:baseline;gap:12px;border-bottom:1px solid var(--ink);padding:10px 16px}
+#w14-plate .eyebrow{font-family:ui-monospace,Menlo,monospace;font-size:11px;letter-spacing:.18em;color:var(--note)}
+#w14-plate .title{font-size:17px;font-style:italic}
+#w14-plate .stage{padding:8px 16px 0}
+#w14-plate svg{display:block;width:100%;height:auto}
+#w14-plate .ctl{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:8px 16px;
+  font-family:ui-monospace,Menlo,monospace;font-size:12px}
+#w14-plate input[type=range]{flex:1;min-width:170px;accent-color:#2B4C7E}
+#w14-plate .ro{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;line-height:1.7;min-height:66px;padding:2px 16px 8px}
+#w14-plate .ro .ch{color:var(--inh);font-weight:700}
+#w14-plate .ro .lm{color:var(--exc);font-weight:700}
+#w14-plate .cap{font-size:13px;line-height:1.5;padding:9px 16px 12px;border-top:1px dashed var(--grid);font-style:italic}
+</style>
+<div class="hd"><span class="eyebrow">INTERACTIVE FIGURE 14</span><span class="title">The wall and the gradient — how far ahead of commitment is the future readable?</span></div>
+<div class="stage"><svg id="w14-svg" viewBox="0 0 800 310" role="img" aria-label="Destiny readability vs distance to commitment"></svg></div>
+<div class="ctl">
+  <span>distance before commitment</span>
+  <input type="range" id="w14-d" min="1" max="16" value="4" aria-label="distance">
+  <span id="w14-dv" style="min-width:10ch">4 steps out</span>
+</div>
+<div class="ro" id="w14-ro"></div>
+<div class="cap">Both curves are measured, normalized as readability relative to base rate (1× = no information). Chess
+(rust): can the network's state predict which endgame <i>program</i> this game will enter? Zero lift beyond eight plies,
+then a step of +0.13 at the door — a <b>wall</b>, and arguably correct calibration: between near-equal players the
+destination genuinely isn't determined earlier. Language (green): can kernel neighbors predict the token a
+continuation will settle on? 5.5× base one token out, decaying smoothly, still 2.6× base sixteen tokens out — a
+<b>gradient with a long tail</b>, partly because single-author text telegraphs its destinations topically where
+adversarial games hide theirs. Same question, opposite epistemic structures — and for language, upcoming content is
+substantially readable before emission, by nothing fancier than nearest neighbors.</div>
+<script>
+(function(){
+const EXC='#2E7D4F', INH='#B3402A', INK='#21241F', NOTE='#2B4C7E', GRID='#CFCCC0';
+// measured anchors
+// chess: destiny-visibility lift over base: ~0 (slightly negative) beyond 8 plies; +0.13 in the 1-8 bin.
+// expressed as multiple of base rate (base 0.44): 1-8 plies out => (0.44+0.13)/0.44 = 1.30x; beyond => ~1.0x (0.97x).
+const chess=d=>d<=8?1.30:0.97;
+// language: readability 0.390 at d=1 -> 0.184 at d=16, base 0.071 => 5.49x -> 2.59x, smooth decay
+const lm=d=>{const r=0.390*Math.pow(0.184/0.390, (d-1)/15);return r/0.071;};
+const svg=document.getElementById('w14-svg');
+function el(n,at){const e=document.createElementNS('http://www.w3.org/2000/svg',n);
+  for(const k in at)e.setAttribute(k,at[k]);return e;}
+function lab(x,y,t,c,a,sz){const e=el('text',{x,y,'font-size':sz||10.5,'font-family':'monospace',
+  fill:c||INK,'text-anchor':a||'start'});e.textContent=t;svg.appendChild(e);return e;}
+const X0=56,X1=770,Y0=20,Y1=262, MAX=6;
+const xs=d=>X0+(16-d)/15*(X1-X0);            // farther out on the left, commitment at right
+const ys=v=>Y1-(v/MAX)*(Y1-Y0);
+function draw(d){
+  svg.innerHTML='';
+  el.call&&0;
+  svg.appendChild(el('rect',{x:X0,y:Y0,width:X1-X0,height:Y1-Y0,fill:'#fff',stroke:GRID}));
+  [1,2,3,4,5,6].forEach(v=>{svg.appendChild(el('line',{x1:X0,y1:ys(v),x2:X1,y2:ys(v),
+    stroke:v===1?'#B9B6AA':GRID,'stroke-width':v===1?1.4:0.6}));
+    lab(X0-6,ys(v)+3,v+'×','#8a877c','end');});
+  [16,12,8,4,1].forEach(t=>lab(xs(t),Y1+14,String(t),'#8a877c','middle'));
+  lab((X0+X1)/2,Y1+30,'steps before commitment (plies / tokens) — commitment at the right edge','#8a877c','middle');
+  lab(X0+4,Y0+12,'destiny readability, × base rate  (1× = no information)','#8a877c');
+  lab(X0+4,ys(1)-6,'no information',"#8a877c");
+  // chess wall
+  let dC='M'+xs(16)+','+ys(chess(16));
+  for(let t=16;t>8;t--)dC+='L'+xs(t)+','+ys(chess(t));
+  dC+='L'+xs(8.001)+','+ys(0.97)+'L'+xs(8)+','+ys(1.30);
+  for(let t=8;t>=1;t--)dC+='L'+xs(t)+','+ys(chess(t));
+  svg.appendChild(el('path',{d:dC,fill:'none',stroke:INH,'stroke-width':2.4}));
+  lab(xs(12),ys(0.97)+16,'chess: the wall',INH,'middle');
+  lab(xs(4.5),ys(1.30)-10,'+0.13 lift, 1–8 plies only',INH,'middle',9.5);
+  // language gradient
+  let dL='';for(let t=16;t>=1;t--)dL+=(t===16?'M':'L')+xs(t)+','+ys(lm(t));
+  svg.appendChild(el('path',{d:dL,fill:'none',stroke:EXC,'stroke-width':2.4}));
+  [1,4,8,16].forEach(t=>svg.appendChild(el('circle',{cx:xs(t),cy:ys(lm(t)),r:3.5,fill:EXC})));
+  lab(xs(15),ys(lm(15))-10,'language: the gradient',EXC);
+  // cursor
+  svg.appendChild(el('line',{x1:xs(d),y1:Y0,x2:xs(d),y2:Y1,stroke:INK,'stroke-width':1.3,'stroke-dasharray':'3 4'}));
+  [ [chess(d),INH],[lm(d),EXC] ].forEach(([v,c])=>{
+    svg.appendChild(el('circle',{cx:xs(d),cy:ys(v),r:6,fill:'#fff',stroke:c,'stroke-width':2.4}));
+    lab(xs(d)+9,ys(v)+4,v.toFixed(2)+'×',c);});
+  document.getElementById('w14-dv').textContent=d+(d===1?' step out':' steps out');
+  document.getElementById('w14-ro').innerHTML=
+    `<span class="ch">chess @ ${d} ${d===1?'ply':'plies'} out: ${chess(d).toFixed(2)}× base</span> — `+
+    (d>8?`indistinguishable from no information; the destination isn't in the state because, between equal players, it isn't determined yet.`
+        :`inside the door: the endgame program is being chosen <i>now</i>, and the state shows it.`)+
+    `<br><span class="lm">language @ ${d} ${d===1?'token':'tokens'} out: ${lm(d).toFixed(2)}× base</span> — `+
+    (d<=2?`the settled phrase is all but announced.`:d<=8?`substantially readable — nearest neighbors in state space already lean toward the destination.`
+      :`still ${lm(d).toFixed(1)}× base at long range: single-author text telegraphs where adversarial games conceal.`);
+}
+document.getElementById('w14-d').addEventListener('input',e=>draw(+e.target.value));
+draw(4);
+})();
+</script>
+</div>
+<!--FRAGMENT END-->
+</body>
+</html>

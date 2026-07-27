@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Interactive Figure 1 — A dense layer and its unit-net analog</title>
+<style>body{background:#F7F6F1;margin:0;padding:24px;display:flex;justify-content:center}</style>
+</head>
+<body>
+<!--FRAGMENT START-->
+<div class="plate" id="w1-plate">
+<style>
+#w1-plate{--paper:#F7F6F1;--ink:#21241F;--exc:#2E7D4F;--inh:#B3402A;--grid:#CFCCC0;--note:#2B4C7E;
+  font-family:Georgia,'Times New Roman',serif;color:var(--ink);background:var(--paper);
+  border:1px solid var(--ink);max-width:860px;margin:0 auto;padding:0}
+#w1-plate .hd{display:flex;align-items:baseline;gap:12px;border-bottom:1px solid var(--ink);padding:10px 16px}
+#w1-plate .eyebrow{font-family:ui-monospace,'SF Mono',Menlo,monospace;font-size:11px;letter-spacing:.18em;color:var(--note)}
+#w1-plate .title{font-size:17px;font-style:italic}
+#w1-plate .panels{display:flex;flex-wrap:wrap}
+#w1-plate .panel{flex:1 1 340px;min-width:320px;padding:8px 8px 0}
+#w1-plate .panel h4{font-family:ui-monospace,Menlo,monospace;font-size:12px;font-weight:400;letter-spacing:.06em;
+  text-align:center;margin:6px 0 0;color:var(--ink)}
+#w1-plate .panel h4 b{font-weight:700}
+#w1-plate svg{display:block;width:100%;height:auto}
+#w1-plate .readout{font-family:ui-monospace,Menlo,monospace;font-size:12px;min-height:34px;
+  border-top:1px dashed var(--grid);margin:4px 12px 0;padding:7px 4px;color:var(--ink)}
+#w1-plate .readout .dim{color:#8a877c}
+#w1-plate .bar{display:flex;align-items:center;gap:14px;border-top:1px solid var(--ink);padding:9px 16px;flex-wrap:wrap}
+#w1-plate button{font-family:ui-monospace,Menlo,monospace;font-size:12px;background:var(--paper);color:var(--ink);
+  border:1px solid var(--ink);padding:5px 14px;cursor:pointer}
+#w1-plate button:hover{background:var(--ink);color:var(--paper)}
+#w1-plate button:focus-visible{outline:2px solid var(--note);outline-offset:2px}
+#w1-plate .legend{font-family:ui-monospace,Menlo,monospace;font-size:11px;display:flex;gap:16px;flex-wrap:wrap}
+#w1-plate .sw{display:inline-block;width:18px;height:0;border-top:3px solid;vertical-align:middle;margin-right:5px}
+#w1-plate .cap{font-size:13px;line-height:1.5;padding:9px 16px 12px;border-top:1px dashed var(--grid);font-style:italic}
+@media (max-width:720px){#w1-plate .panels{flex-direction:column}}
+</style>
+<div class="hd"><span class="eyebrow">INTERACTIVE FIGURE 1</span><span class="title">A dense layer and its unit-net analog</span></div>
+<div class="panels">
+  <div class="panel">
+    <h4>ordinary dense layer &nbsp;<b>W ∈ ℝ</b> — any sign, any scale</h4>
+    <svg id="w1-svgL" viewBox="0 0 400 330" role="img" aria-label="Dense layer diagram"></svg>
+    <div class="readout" id="w1-roL"><span class="dim">hover a neuron (n1\u2013n5) to see its row \u2014 raw weight values appear on the edges</span></div>
+  </div>
+  <div class="panel">
+    <h4>unit-net layer &nbsp;<b>z = Pa − Na</b> — Σ row(P) = 1, N ∈ [0,1]</h4>
+    <svg id="w1-svgR" viewBox="0 0 400 330" role="img" aria-label="Unit-net layer diagram"></svg>
+    <div class="readout" id="w1-roR"><span class="dim">hover a neuron (n1\u2013n5) \u2014 P shares (green) and \u2212N (rust) appear on the edges</span></div>
+  </div>
+</div>
+<div class="bar">
+  <button id="w1-resample">Resample weights</button>
+  <div class="legend">
+    <span><span class="sw" style="border-color:#2E7D4F"></span>excitation (+)</span>
+    <span><span class="sw" style="border-color:#B3402A;border-top-style:dashed"></span>inhibition (−)</span>
+    <span><span class="sw" style="border-color:#21241F;border-top-width:6px;width:26px"></span>budget bar, ticked at 1.0</span>
+  </div>
+</div>
+<div class="cap">Same connectivity, two coordinate systems. On the left, each neuron's incoming row lives on whatever
+scale training left it — hover different neurons and watch Σ|w| swing by ~40×, which is why "this weight is big" carries
+no meaning across neurons. On the right the invariant is structural: every neuron's excitation stacks to exactly
+1.000 (the black-ticked bar), every inhibitory synapse is ≤ 1, and edge thicknesses are comparable <i>everywhere in the
+figure</i>. Each budget bar is the neuron's whole P row laid end to end: one green segment per input, in input order
+(a1…a6), so a segment's length is that input's share of the budget and the white lines are the boundaries between
+shares — hover the neuron and the same numbers appear on its edges. Resample as many times as you like — the segments
+reshuffle, but the bar always fills to exactly the 1.0 tick.</div>
+<script>
+(function(){
+const NI=6, NH=5, W=400, H=330, xin=52, xout=310, pad=30;
+const yin=i=>pad+ i*(H-2*pad)/(NI-1), yout=j=>pad+18+ j*(H-2*pad-36)/(NH-1);
+const EXC='#2E7D4F', INH='#B3402A', INK='#21241F';
+let dense, P, N;
+function randn(){let u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();
+  return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+function sample(){
+  dense=[];P=[];N=[];
+  for(let j=0;j<NH;j++){
+    const scale=Math.pow(10, (Math.random()*2-1)*0.85)*1.6;           // row scales spread ~40x
+    dense.push(Array.from({length:NI},()=>scale*randn()));
+    let p=Array.from({length:NI},()=>Math.exp(randn()));
+    // sparsify a little, renormalize -> exact simplex
+    p=p.map(v=>v<0.55?0.02*v:v); const s=p.reduce((a,b)=>a+b,0); P.push(p.map(v=>v/s));
+    N.push(Array.from({length:NI},()=>{const r=Math.random();return r<0.45?0:Math.random()*Math.random();}));
+  }
+}
+function el(n,at){const e=document.createElementNS('http://www.w3.org/2000/svg',n);
+  for(const k in at)e.setAttribute(k,at[k]);return e;}
+function drawPanel(svg, edges, nodesExtra, hover){
+  svg.innerHTML='';
+  const gE=el('g',{}), gN=el('g',{}), gL=el('g',{'pointer-events':'none'});
+  edges.forEach(e=>{
+    const l=el('line',{x1:xin,y1:yin(e.i),x2:xout,y2:yout(e.j),
+      stroke:e.neg?INH:EXC,'stroke-width':e.w,'stroke-linecap':'round',
+      'stroke-dasharray':e.neg?'5 4':'none',class:'e j'+e.j,opacity:0.85});
+    gE.appendChild(l);
+  });
+  function showLabels(j){
+    gL.innerHTML='';
+    edges.filter(e=>e.j===j).forEach(e=>{
+      // stagger labels along the edge by input index so converging edges don't collide;
+      // excitatory labels sit above the line, inhibitory below
+      const t=0.28+0.105*e.i;
+      const x=xin+(xout-xin)*t, y=yin(e.i)+(yout(j)-yin(e.i))*t;
+      const dx=xout-xin, dy=yout(j)-yin(e.i), len=Math.hypot(dx,dy);
+      const off=(e.neg?1:-1)*(7+e.w*0.5);
+      const lx=x+(-dy/len)*off, ly=y+(dx/len)*off;
+      const txt=el('text',{x:lx,y:ly+3.5,'font-size':10.5,'font-family':'monospace',
+        'font-weight':700,'text-anchor':'middle',fill:e.neg?INH:EXC,
+        stroke:'#F7F6F1','stroke-width':3,'paint-order':'stroke'});
+      txt.textContent=e.label;
+      gL.appendChild(txt);
+    });
+  }
+  for(let i=0;i<NI;i++){
+    gN.appendChild(el('circle',{cx:xin,cy:yin(i),r:6,fill:'#F7F6F1',stroke:INK,'stroke-width':1.4}));
+    gN.appendChild(el('text',{x:xin-24,y:yin(i)+4,'font-size':11,'font-family':'monospace',fill:'#8a877c'})).textContent='a'+(i+1);
+  }
+  for(let j=0;j<NH;j++){
+    const c=el('circle',{cx:xout,cy:yout(j),r:9,fill:'#F7F6F1',stroke:INK,'stroke-width':1.6,style:'cursor:pointer'});
+    c.addEventListener('mouseenter',()=>{
+      svg.querySelectorAll('.e').forEach(x=>x.setAttribute('opacity',0.06));
+      svg.querySelectorAll('.j'+j).forEach(x=>x.setAttribute('opacity',1));
+      c.setAttribute('fill','#EDEAE0'); showLabels(j); hover(j);});
+    c.addEventListener('mouseleave',()=>{
+      svg.querySelectorAll('.e').forEach(x=>x.setAttribute('opacity',0.85));
+      c.setAttribute('fill','#F7F6F1'); gL.innerHTML=''; hover(-1);});
+    gN.appendChild(c);
+    gN.appendChild(el('text',{x:xout+16,y:yout(j)+4,'font-size':11,'font-family':'monospace',fill:INK})).textContent='n'+(j+1);
+    if(nodesExtra)nodesExtra(gN,j);
+  }
+  svg.appendChild(gE);svg.appendChild(gN);svg.appendChild(gL);
+}
+function render(){
+  const svgL=document.getElementById('w1-svgL'), svgR=document.getElementById('w1-svgR');
+  const roL=document.getElementById('w1-roL'), roR=document.getElementById('w1-roR');
+  // left: widths normalized by GLOBAL max |w| -> some rows nearly invisible, some fat
+  const gmax=Math.max(...dense.flat().map(Math.abs));
+  const eL=[]; for(let j=0;j<NH;j++)for(let i=0;i<NI;i++){const w=dense[j][i];
+    eL.push({i,j,neg:w<0,w:Math.max(0.35,Math.abs(w)/gmax*9),label:w.toFixed(1)});}
+  drawPanel(svgL,eL,null,j=>{
+    if(j<0){roL.innerHTML='<span class="dim">hover a neuron (n1\u2013n5) to see its row \u2014 raw weight values appear on the edges</span>';return;}
+    const s=dense[j].reduce((a,b)=>a+Math.abs(b),0);
+    const sums=dense.map(r=>r.reduce((a,b)=>a+Math.abs(b),0));
+    roL.textContent=`n${j+1}:  Σ|w| = ${s.toFixed(2)}   ·   row scales in this layer span ×${(Math.max(...sums)/Math.min(...sums)).toFixed(0)}`;
+  });
+  // right: P edges (absolute widths: p*11), N edges (n*6), plus budget bars
+  const eR=[]; for(let j=0;j<NH;j++)for(let i=0;i<NI;i++){
+    if(P[j][i]>0.015)eR.push({i,j,neg:false,w:P[j][i]*11,label:P[j][i].toFixed(2)});
+    if(N[j][i]>0.03)eR.push({i,j,neg:true,w:N[j][i]*6,label:'\u2212'+N[j][i].toFixed(2)});}
+  drawPanel(svgR,eR,(g,j)=>{
+    // budget bar: 54px == 1.0, stacked P segments, tick at 1.0
+    const bx=xout+34, by=yout(j)-4, bw=52;
+    let acc=0;
+    P[j].forEach((p,i)=>{ if(p<0.004)return;
+      g.appendChild(el('rect',{x:bx+acc*bw,y:by,width:Math.max(0.5,p*bw),height:8,fill:EXC,
+        stroke:'#F7F6F1','stroke-width':0.6})); acc+=p;});
+    g.appendChild(el('rect',{x:bx,y:by,width:bw,height:8,fill:'none',stroke:INK,'stroke-width':1}));
+    g.appendChild(el('line',{x1:bx+bw,y1:by-3,x2:bx+bw,y2:by+11,stroke:INK,'stroke-width':2}));
+  },j=>{
+    if(j<0){roR.innerHTML='<span class="dim">hover a neuron (n1\u2013n5) \u2014 P shares (green) and \u2212N (rust) appear on the edges</span>';return;}
+    const s=P[j].reduce((a,b)=>a+b,0), nm=Math.max(...N[j]);
+    roR.textContent=`n${j+1}:  Σ P = ${s.toFixed(3)}  (always)   ·   max N = ${nm.toFixed(2)} ≤ 1   ·   largest budget share ${(Math.max(...P[j])*100).toFixed(0)}%`;
+  });
+}
+document.getElementById('w1-resample').addEventListener('click',()=>{sample();render();});
+sample();render();
+})();
+</script>
+</div>
+<!--FRAGMENT END-->
+</body>
+</html>

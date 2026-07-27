@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Interactive Figure 12 — Prior starvation, budget-curable</title>
+<style>body{background:#F7F6F1;margin:0;padding:24px;display:flex;justify-content:center}</style>
+</head>
+<body>
+<!--FRAGMENT START-->
+<div class="plate" id="w12-plate">
+<style>
+#w12-plate{--paper:#F7F6F1;--ink:#21241F;--exc:#2E7D4F;--inh:#B3402A;--grid:#CFCCC0;--note:#2B4C7E;--gold:#C89B3C;
+  font-family:Georgia,'Times New Roman',serif;color:var(--ink);background:var(--paper);
+  border:1px solid var(--ink);max-width:860px;margin:0 auto}
+#w12-plate .hd{display:flex;align-items:baseline;gap:12px;border-bottom:1px solid var(--ink);padding:10px 16px}
+#w12-plate .eyebrow{font-family:ui-monospace,Menlo,monospace;font-size:11px;letter-spacing:.18em;color:var(--note)}
+#w12-plate .title{font-size:17px;font-style:italic}
+#w12-plate .stage{padding:8px 16px 0}
+#w12-plate svg{display:block;width:100%;height:auto}
+#w12-plate .ctl{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:8px 16px;
+  font-family:ui-monospace,Menlo,monospace;font-size:12px}
+#w12-plate input[type=range]{flex:1;min-width:170px;accent-color:#2B4C7E}
+#w12-plate .ro{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;line-height:1.7;min-height:64px;
+  padding:2px 16px 10px}
+#w12-plate .ro b.v{color:var(--note)}
+#w12-plate .cap{font-size:13px;line-height:1.5;padding:9px 16px 12px;border-top:1px dashed var(--grid);font-style:italic}
+</style>
+<div class="hd"><span class="eyebrow">INTERACTIVE FIGURE 12</span><span class="title">Prior starvation, budget-curable — the castling recovery curve</span></div>
+<div class="stage"><svg id="w12-svg" viewBox="0 0 800 300" role="img" aria-label="Castling rate vs simulation budget"></svg></div>
+<div class="ctl">
+  <span>search budget</span>
+  <input type="range" id="w12-n" min="0" max="5" step="1" value="3" aria-label="simulation budget">
+  <span id="w12-nv" style="min-width:9ch">200 sims</span>
+</div>
+<div class="ro" id="w12-ro"></div>
+<div class="cap">Measured data (192 middlegame roots from master games, 12-ply horizon). The raw policy castles in
+0.0% of continuations where humans castle in 22.0% — yet at the very positions where humans castled, the policy's own
+value head ranks the castling move #1 in 43% of cases. The prior just starves it: median prior mass 0.0092, so search
+discovers the branch only in proportion to budget. This is the same starve-the-search wiring as KataGo's urgency
+horizon (post 4) with one decisive difference — there the value head shared the blindness (defense in depth,
+uncurable by budget); here it dissents, so every simulation added claws back behavior the prior suppressed.</div>
+<script>
+(function(){
+const EXC='#2E7D4F', INH='#B3402A', INK='#21241F', NOTE='#2B4C7E', GRID='#CFCCC0', GOLD='#C89B3C';
+// measured: castle_curve.py
+const SIMS=[25,50,100,200,400,800], RATE=[0.002,0.011,0.049,0.110,0.169,0.176];
+const HUMAN=0.220, POLICY=0.0, PRIOR=0.0092;
+const svg=document.getElementById('w12-svg');
+function el(n,at){const e=document.createElementNS('http://www.w3.org/2000/svg',n);
+  for(const k in at)e.setAttribute(k,at[k]);return e;}
+function lab(x,y,t,c,a,sz){const e=el('text',{x,y,'font-size':sz||11,'font-family':'monospace',
+  fill:c||INK,'text-anchor':a||'start'});e.textContent=t;svg.appendChild(e);return e;}
+const X0=64,X1=760,Y0=24,Y1=252;
+const xs=s=>X0+(Math.log2(s/25))/Math.log2(800/25)*(X1-X0);
+const ys=r=>Y1-(r/0.25)*(Y1-Y0);
+function draw(idx){
+  svg.innerHTML='';
+  svg.appendChild(el('rect',{x:X0,y:Y0,width:X1-X0,height:Y1-Y0,fill:'#fff',stroke:GRID}));
+  [0,0.05,0.10,0.15,0.20,0.25].forEach(v=>{
+    svg.appendChild(el('line',{x1:X0,y1:ys(v),x2:X1,y2:ys(v),stroke:GRID,'stroke-width':0.6}));
+    lab(X0-6,ys(v)+3,(v*100).toFixed(0)+'%','#8a877c','end');});
+  SIMS.forEach(s=>lab(xs(s),Y1+16,String(s),'#8a877c','middle'));
+  lab((X0+X1)/2,Y1+32,'MCTS simulations per move (log scale)','#8a877c','middle');
+  // human reference
+  svg.appendChild(el('line',{x1:X0,y1:ys(HUMAN),x2:X1,y2:ys(HUMAN),stroke:EXC,'stroke-width':1.8,'stroke-dasharray':'7 5'}));
+  lab(X1-4,ys(HUMAN)-6,'humans: 22.0%',EXC,'end');
+  // raw policy reference
+  svg.appendChild(el('line',{x1:X0,y1:ys(POLICY),x2:X1,y2:ys(POLICY),stroke:INH,'stroke-width':1.8}));
+  lab(X0+6,ys(POLICY)-7,'raw policy: 0.0% (627 games, zero castles)',INH);
+  // curve
+  let d='';SIMS.forEach((s,i)=>{d+=(i?'L':'M')+xs(s)+','+ys(RATE[i]);});
+  svg.appendChild(el('path',{d,fill:'none',stroke:NOTE,'stroke-width':2.4}));
+  SIMS.forEach((s,i)=>svg.appendChild(el('circle',{cx:xs(s),cy:ys(RATE[i]),r:i===idx?7:4,
+    fill:i===idx?NOTE:'#fff',stroke:NOTE,'stroke-width':2})));
+  // cursor annotation
+  const s=SIMS[idx], r=RATE[idx], visits=Math.round(s*PRIOR*10)/10;
+  svg.appendChild(el('line',{x1:xs(s),y1:ys(r),x2:xs(s),y2:Y1,stroke:INK,'stroke-width':1,'stroke-dasharray':'2 3'}));
+  lab(xs(s),ys(r)-14,(r*100).toFixed(1)+'%',NOTE,'middle',13);
+  // value head note
+  lab(X0+6,Y0+16,'value head at these positions: ranks the castle #1 in 43%, top-3 in 80%',GOLD,undefined,10.5);
+  document.getElementById('w12-nv').textContent=s+' sims';
+  document.getElementById('w12-ro').innerHTML=
+    `at <b class="v">${s} simulations</b>: a 0.92%-prior child receives ≈ <b class="v">${visits} visit${visits===1?'':'s'}</b> — `+
+    (visits<2?`not enough to even open the branch most of the time → castling rate ${(r*100).toFixed(1)}%`
+     :visits<5?`enough to open the branch but rarely to overturn a half-point margin → ${(r*100).toFixed(1)}%`
+     :`enough for the value head's endorsement to accumulate → ${(r*100).toFixed(1)}%, halfway to human by 200 and decelerating toward ≈18%`)+
+    `.<br>Every point on this curve is the value head outvoting the prior at a rate set purely by budget.`;
+}
+document.getElementById('w12-n').addEventListener('input',e=>draw(+e.target.value));
+draw(3);
+})();
+</script>
+</div>
+<!--FRAGMENT END-->
+</body>
+</html>

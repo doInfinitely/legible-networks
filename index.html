@@ -1,0 +1,70 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Legible Networks</title>
+<style>
+body{background:#F7F6F1;color:#21241F;font-family:Georgia,'Times New Roman',serif;
+  margin:0;padding:28px 16px 80px;line-height:1.62;font-size:17px}
+main{max-width:760px;margin:0 auto}
+h1{font-size:34px;line-height:1.2;margin:.4em 0 .3em}
+.subtitle{color:#6B6A60;font-size:17px;margin:0 0 2em;border-bottom:1px solid #CFCCC0;padding-bottom:1.2em}
+a{color:#2B4C7E}
+ol.toc{list-style:none;padding:0;margin:0}
+.toc-entry{margin:0 0 26px;padding:18px 20px;background:#F1EFE7;border-left:3px solid #2B4C7E}
+.toc-title{font-size:21px;font-weight:bold;text-decoration:none;display:block;line-height:1.3}
+.toc-title:hover{text-decoration:underline}
+.toc-num{display:inline-block;min-width:1.5em;color:#6B6A60;font-weight:normal}
+.toc-pitch{margin:.5em 0 .3em;font-size:15.5px;color:#44453E}
+.toc-sections summary{cursor:pointer;font-size:14px;color:#6B6A60}
+.toc-sections ul{margin:.4em 0 .2em;padding-left:2.1em;font-size:14.5px;color:#44453E}
+.toc-sections li{margin:2px 0}
+footer{margin-top:3em;border-top:1px solid #CFCCC0;padding-top:1em;font-size:14.5px;color:#6B6A60}
+@media (max-width:640px){body{font-size:16px;padding:16px 10px 60px}h1{font-size:27px}.toc-title{font-size:18px}}
+</style></head><body><main>
+<h1>Legible Networks</h1>
+<p class="subtitle">An eight-post series on the unit-net / explainable-AI research arc: geometry, training,
+transplant, and four case studies in what exact legibility buys you — blind spots, latent knowledge,
+audit methodology, and the geometry of deep computation. A human–AI collaboration (Remy &amp; Claude).</p>
+<ol class="toc">
+<li class="toc-entry">
+  <a class="toc-title" href="01-training-without-gradients.html"><span class="toc-num">1</span>Training Without Gradients in a Weight-Budget Geometry</a>
+  <p class="toc-pitch">Optimization methods ranked by the information channel they consume — measured head-to-head on one substrate.</p>
+  <details class="toc-sections"><summary>In this post</summary><ul><li>The puzzle</li><li>The geometry</li><li>What backprop had to survive</li><li>The annealer, and what actually mattered</li><li>Interlude: delta evaluation, or how the annealer got 50× cheaper</li><li>The information ladder</li><li>When does the ladder invert?</li><li>The thesis the day earned</li><li>Why this is post 1</li></ul></details>
+</li>
+<li class="toc-entry">
+  <a class="toc-title" href="02-a-language-model-you-can-read.html"><span class="toc-num">2</span>A Language Model You Can Read With Arithmetic</a>
+  <p class="toc-pitch">An exact interpretability lens, designed concept neurons, and the first measurement of how lossy averaged lenses actually are.</p>
+  <details class="toc-sections"><summary>In this post</summary><ul><li>The puzzle</li><li>Getting an honest student (harder than the science)</li><li>The lens results</li><li>Workspace signatures, replayed in a readable substrate</li><li>j-carve: cutting task reasoners out of J-space, with certificates</li><li>Where this left us</li><li>Addendum: j-carve on the transplanted Qwen (added 2026-07-26)</li></ul></details>
+</li>
+<li class="toc-entry">
+  <a class="toc-title" href="03-your-network-is-already-a-unit-net.html"><span class="toc-num">3</span>Your Network Is Already (Mostly) a Unit-Net</a>
+  <p class="toc-pitch">Pretrained superhuman nets can be moved into the legible geometry exactly, without a gradient step.</p>
+  <details class="toc-sections"><summary>In this post</summary><ul><li>The puzzle</li><li>The idea: scale symmetry and scale debt</li><li>Where debt goes to die</li><li>From naive collapse to exact fold</li><li>The last 0.03%: scale debt becomes temperature</li><li>What legality buys, immediately</li><li>The transplant law</li></ul></details>
+</li>
+<li class="toc-entry">
+  <a class="toc-title" href="04-anatomy-of-a-blind-spot.html"><span class="toc-num">4</span>Anatomy of a Blind Spot: KataGo's Cyclic Vulnerability, End to End</a>
+  <p class="toc-pitch">The complete mechanism of KataGo's cyclic vulnerability: not a fooled feature, a certified representational absence.</p>
+  <details class="toc-sections"><summary>In this post</summary><ul><li>The puzzle</li><li>1. Confidently, in-distribution wrong</li><li>2. The urgency horizon</li><li>3. The misread is causally steerable</li><li>4. The rule, exactly: extracting the automaton</li><li>5. The comparator is a passenger</li><li>6. Calibration defects vs representational defects</li><li>7. The certified absence</li><li>8. Scale doesn't buy it</li><li>9. Why LW readers should care</li></ul></details>
+</li>
+<li class="toc-entry">
+  <a class="toc-title" href="05-the-stack-the-model-never-read.html"><span class="toc-num">5</span>The Stack the Model Never Read</a>
+  <p class="toc-pitch">A textbook ELK case study: perfect latent structure, a behavior that ignores it, and the finetune that elicits it.</p>
+  <details class="toc-sections"><summary>In this post</summary><ul><li>The puzzle</li><li>1. Making the Chomsky hierarchy measurable</li><li>2. The counter: three answers at three levels</li><li>3. The soft stack</li><li>4. The dissociation, and the hunt for the reader</li><li>5. The bag</li><li>6. The elicitation</li><li>7. Why this matters</li></ul></details>
+</li>
+<li class="toc-entry">
+  <a class="toc-title" href="06-consumers-and-the-gain-ledger.html"><span class="toc-num">6</span>Consumers, Not Representations — and How We Convicted Our Own Nulls</a>
+  <p class="toc-pitch">“We found a direction for X” is half a result; the other half is whether anything reads it.</p>
+  <details class="toc-sections"><summary>In this post</summary><ul><li>The puzzle</li><li>1. The specimen</li><li>2. Attempt one: let training build the reader</li><li>3. Attempt two: surgery</li><li>4. Attempt three: give the mass to search</li><li>5. Attempt four: composition — and the control that makes it meaningful</li><li>6. The seeds sweep: the kill-test the conclusion owed</li><li>7. The gain ledger: putting our own nulls on trial</li><li>8. The corrected laws</li><li>9. On publishing your own convictions</li></ul></details>
+</li>
+<li class="toc-entry">
+  <a class="toc-title" href="07-audit-your-audits.html"><span class="toc-num">7</span>Audit Your Audits: The Baseline Law and the Grounding Law</a>
+  <p class="toc-pitch">Two methodological laws for anyone measuring “drives” in trained agents: baselines and grounding.</p>
+  <details class="toc-sections"><summary>In this post</summary><ul><li>The puzzle</li><li>1. The instrument</li><li>2. The trap, and the three rebasings</li><li>3. What the residual actually is: a kill-test chain</li><li>4. The grounding law</li><li>5. Why we think this pair matters</li></ul></details>
+</li>
+<li class="toc-entry">
+  <a class="toc-title" href="08-the-drifting-frame.html"><span class="toc-num">8</span>The Drifting Frame and the Program Atlas: What Deep Computation Actually Is</a>
+  <p class="toc-pitch">Net path attribution is identically zero past ~5 layers; information persists while the coordinate frame rotates.</p>
+  <details class="toc-sections"><summary>In this post</summary><ul><li>The puzzle</li><li>1. Evaporation: where the positive mass goes</li><li>2. Effective depth: the visible computation is 1–2 blocks deep</li><li>3. Total cancellation: the terminal statement</li><li>4. Persistence: information stays; encodings rotate</li><li>5. The drifting frame</li><li>6. The deviation lens</li><li>7. The program atlas: counting a network's situations</li><li>Coda: the series, and what we'd ask of you</li></ul></details>
+</li>
+</ol>
+<footer>Code: <a href="https://github.com/doInfinitely/unit-net">github.com/doInfinitely/unit-net</a></footer>
+</main></body></html>

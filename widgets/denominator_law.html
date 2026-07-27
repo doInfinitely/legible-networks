@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Interactive Figure 6 — The denominator law</title>
+<style>body{background:#F7F6F1;margin:0;padding:24px;display:flex;justify-content:center}</style>
+</head>
+<body>
+<!--FRAGMENT START-->
+<div class="plate" id="w6-plate">
+<style>
+#w6-plate{--paper:#F7F6F1;--ink:#21241F;--exc:#2E7D4F;--inh:#B3402A;--grid:#CFCCC0;--note:#2B4C7E;
+  font-family:Georgia,'Times New Roman',serif;color:var(--ink);background:var(--paper);
+  border:1px solid var(--ink);max-width:860px;margin:0 auto}
+#w6-plate .hd{display:flex;align-items:baseline;gap:12px;border-bottom:1px solid var(--ink);padding:10px 16px}
+#w6-plate .eyebrow{font-family:ui-monospace,Menlo,monospace;font-size:11px;letter-spacing:.18em;color:var(--note)}
+#w6-plate .title{font-size:17px;font-style:italic}
+#w6-plate .ctl{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:12px 16px 2px;
+  font-family:ui-monospace,Menlo,monospace;font-size:12px}
+#w6-plate input[type=range]{width:150px;accent-color:#2B4C7E}
+#w6-plate button{font-family:ui-monospace,Menlo,monospace;font-size:12px;background:var(--paper);color:var(--ink);
+  border:1px solid var(--ink);padding:4px 12px;cursor:pointer}
+#w6-plate button:hover{background:var(--ink);color:var(--paper)}
+#w6-plate button:focus-visible{outline:2px solid var(--note);outline-offset:2px}
+#w6-plate .stage{padding:4px 16px}
+#w6-plate svg{display:block;width:100%;height:auto}
+#w6-plate .ro{font-family:ui-monospace,Menlo,monospace;font-size:12px;line-height:1.7;padding:2px 16px 10px}
+#w6-plate .warn{color:var(--inh);font-weight:700}
+#w6-plate .ok{color:var(--exc);font-weight:700}
+#w6-plate .cap{font-size:13px;line-height:1.5;padding:9px 16px 12px;border-top:1px dashed var(--grid);font-style:italic}
+</style>
+<div class="hd"><span class="eyebrow">INTERACTIVE FIGURE 6</span><span class="title">The denominator law — one knob is both precision and sparsity</span></div>
+<div class="ctl">
+  <span>row length L</span>
+  <input type="range" id="w6-L" min="8" max="64" value="24" aria-label="row length">
+  <span id="w6-Lv" style="min-width:2ch">24</span>
+  <span>bit budget b</span>
+  <input type="range" id="w6-b" min="2" max="12" value="8" aria-label="bit budget">
+  <span id="w6-bv" style="min-width:2ch">8</span>
+  <button id="w6-re">Resample row</button>
+</div>
+<div class="stage"><svg id="w6-svg" viewBox="0 0 800 170" role="img" aria-label="Integer simplex quantization"></svg></div>
+<div class="ro" id="w6-ro"></div>
+<div class="cap">A legal row is a point on the probability simplex; storing it as integer numerators over a shared
+denominator 2<sup>b</sup> makes it <b>exact fixed-point arithmetic</b> — the numerators sum to 2<sup>b</sup> by
+construction, so there is no float error to accumulate, ever. But integers can't be split: by pigeonhole, once
+2<sup>b</sup> &lt; L (or merely once the mass is spread thin) some synapses must round to zero — the rust ticks. Drag b
+down and watch precision and sparsification move together: they are the same knob. This is why 10-bit quantization of
+the LM student was simultaneously lossless <i>and</i> 5× sparsifying, and why tolerance to the denominator is a
+redundancy meter for the underlying network.</div>
+<script>
+(function(){
+const EXC='#2E7D4F', INH='#B3402A', INK='#21241F', PAPER='#F7F6F1', NOTE='#2B4C7E';
+let seed=13; function rnd(){seed=(seed*1103515245+12345)%2147483648;return seed/2147483648;}
+let baseSeed=13;
+const svg=document.getElementById('w6-svg'), ro=document.getElementById('w6-ro');
+function el(n,at){const e=document.createElementNS('http://www.w3.org/2000/svg',n);
+  for(const k in at)e.setAttribute(k,at[k]);return e;}
+function makeRow(L){
+  seed=baseSeed;
+  let p=Array.from({length:L},()=>Math.exp((rnd()*2-1)*1.4));
+  const s=p.reduce((a,b)=>a+b,0); return p.map(v=>v/s);
+}
+function quantize(p,D){
+  // largest-remainder method: exact integer allocation summing to D
+  const raw=p.map(v=>v*D), fl=raw.map(Math.floor);
+  let rem=D-fl.reduce((a,b)=>a+b,0);
+  const order=raw.map((v,i)=>[v-fl[i],i]).sort((a,b)=>b[0]-a[0]);
+  for(let k=0;k<rem;k++)fl[order[k][1]]++;
+  return fl;
+}
+function render(){
+  const L=+document.getElementById('w6-L').value, b=+document.getElementById('w6-b').value, D=1<<b;
+  const p=makeRow(L), n=quantize(p,D);
+  svg.innerHTML='';
+  const bx=40,bw=720,y1=26,y2=92,h=26;
+  const lab=(x,y,t,c,anchor,size)=>{const e=el('text',{x,y,'font-size':size||11.5,'font-family':'monospace',
+     fill:c||INK,'text-anchor':anchor||'start'});e.textContent=t;svg.appendChild(e);};
+  lab(bx,y1-8,'float row  ·  Σ = 1.000…  (to float precision)');
+  let acc=0;
+  p.forEach(v=>{svg.appendChild(el('rect',{x:bx+acc*bw,y:y1,width:Math.max(0.4,v*bw),height:h,
+    fill:EXC,stroke:PAPER,'stroke-width':0.8}));acc+=v;});
+  svg.appendChild(el('rect',{x:bx,y:y1,width:bw,height:h,fill:'none',stroke:INK,'stroke-width':1.2}));
+  lab(bx,y2-8,`integer row  ·  numerators over 2^${b} = ${D}  ·  Σnᵢ = ${n.reduce((a,c)=>a+c,0)}  exactly`);
+  acc=0; let zeros=0, maxerr=0;
+  n.forEach((ni,i)=>{
+    const v=ni/D; maxerr=Math.max(maxerr,Math.abs(v-p[i]));
+    if(ni===0){zeros++;
+      // rust tick at the position where this synapse's float mass was
+      const fx=bx+p.slice(0,i).reduce((a,c)=>a+c,0)*bw+p[i]*bw/2;
+      svg.appendChild(el('line',{x1:fx,y1:y2+h+3,x2:fx,y2:y2+h+12,stroke:INH,'stroke-width':2}));
+    } else {
+      svg.appendChild(el('rect',{x:bx+acc*bw,y:y2,width:Math.max(0.4,v*bw),height:h,
+        fill:EXC,stroke:PAPER,'stroke-width':0.8}));
+      if(v*bw>26)lab(bx+acc*bw+v*bw/2,y2+h/2+4,String(ni),PAPER,'middle',10.5);
+      acc+=v;}
+  });
+  svg.appendChild(el('rect',{x:bx,y:y2,width:bw,height:h,fill:'none',stroke:INK,'stroke-width':1.2}));
+  svg.appendChild(el('line',{x1:bx+bw,y1:y1-4,x2:bx+bw,y2:y2+h+4,stroke:INK,'stroke-width':2}));
+  lab(bx+bw+6,y2+h/2+4,'1.0');
+  if(zeros)lab(bx,y2+h+26,`▎ forced zeros (${zeros})`,INH,'start',10.5);
+  const pig=D<L;
+  ro.innerHTML=
+    `denominator 2^${b} = ${D}  vs  row length L = ${L}   ·   `+
+    (pig?`<span class="warn">2^b &lt; L — pigeonhole forces ≥ ${L-D} zeros</span>`
+        :`<span class="ok">2^b ≥ L — zeros optional, thin mass still rounds away</span>`)+
+    `<br>sparsity: ${zeros}/${L} synapses zeroed (${Math.round(100*zeros/L)}%)   ·   max per-entry error ${maxerr.toFixed(4)}   ·   float error in the stored row: <b>none</b> (integers)`;
+}
+document.getElementById('w6-L').addEventListener('input',e=>{
+  document.getElementById('w6-Lv').textContent=e.target.value;render();});
+document.getElementById('w6-b').addEventListener('input',e=>{
+  document.getElementById('w6-bv').textContent=e.target.value;render();});
+document.getElementById('w6-re').addEventListener('click',()=>{baseSeed=Math.floor(Math.random()*1e9);render();});
+render();
+})();
+</script>
+</div>
+<!--FRAGMENT END-->
+</body>
+</html>

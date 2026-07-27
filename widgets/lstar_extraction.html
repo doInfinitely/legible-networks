@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Interactive Figure 8 — Extract an automaton yourself</title>
+<style>body{background:#F7F6F1;margin:0;padding:24px;display:flex;justify-content:center}</style>
+</head>
+<body>
+<!--FRAGMENT START-->
+<div class="plate" id="w8-plate">
+<style>
+#w8-plate{--paper:#F7F6F1;--ink:#21241F;--exc:#2E7D4F;--inh:#B3402A;--grid:#CFCCC0;--note:#2B4C7E;
+  font-family:Georgia,'Times New Roman',serif;color:var(--ink);background:var(--paper);
+  border:1px solid var(--ink);max-width:860px;margin:0 auto}
+#w8-plate .hd{display:flex;align-items:baseline;gap:12px;border-bottom:1px solid var(--ink);padding:10px 16px}
+#w8-plate .eyebrow{font-family:ui-monospace,Menlo,monospace;font-size:11px;letter-spacing:.18em;color:var(--note)}
+#w8-plate .title{font-size:17px;font-style:italic}
+#w8-plate .top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 16px 2px;
+  font-family:ui-monospace,Menlo,monospace;font-size:12px}
+#w8-plate button{font-family:ui-monospace,Menlo,monospace;font-size:12px;background:var(--paper);color:var(--ink);
+  border:1px solid var(--ink);padding:5px 14px;cursor:pointer}
+#w8-plate button:hover:not(:disabled){background:var(--ink);color:var(--paper)}
+#w8-plate button:disabled{opacity:.35;cursor:default}
+#w8-plate button:focus-visible{outline:2px solid var(--note);outline-offset:2px}
+#w8-plate .meters{display:flex;gap:18px;flex-wrap:wrap;font-family:ui-monospace,Menlo,monospace;font-size:12px;
+  padding:6px 16px}
+#w8-plate .meters b{font-weight:700}
+#w8-plate .stage{padding:0 16px}
+#w8-plate svg{display:block;width:100%;height:auto}
+#w8-plate .log{font-family:ui-monospace,Menlo,monospace;font-size:11.5px;line-height:1.6;height:96px;overflow-y:auto;
+  margin:8px 16px 10px;border:1px dashed var(--grid);padding:7px 11px;background:#FFFFFF}
+#w8-plate .log .cex{color:var(--inh);font-weight:700}
+#w8-plate .log .hyp{color:var(--note);font-weight:700}
+#w8-plate .log .fin{color:var(--exc);font-weight:700}
+#w8-plate .cap{font-size:13px;line-height:1.5;padding:9px 16px 12px;border-top:1px dashed var(--grid);font-style:italic}
+</style>
+<div class="hd"><span class="eyebrow">INTERACTIVE FIGURE 8</span><span class="title">Extract an automaton yourself — L★ against a black-box oracle</span></div>
+<div class="top">
+  <button id="w8-step">Next hypothesis ▸</button>
+  <button id="w8-run">Run to completion ▸▸</button>
+  <button id="w8-reset">Reset</button>
+  <span>oracle: “ring alive?” for move strings over {<b style="color:#2B4C7E">f</b> = fill inner liberty, <b style="color:#B3402A">g</b> = fill ring liberty}</span>
+</div>
+<div class="meters">
+  <span>oracle queries (incl. equivalence sampling): <b id="w8-mq">0</b></span>
+  <span>distinct positions probed: <b id="w8-pos">0</b></span>
+  <span>hypothesis states: <b id="w8-st">—</b></span>
+  <span id="w8-done" style="color:var(--exc);font-weight:700"></span>
+</div>
+<div class="stage"><svg id="w8-svg" viewBox="0 0 800 260" role="img" aria-label="Hypothesis automaton"></svg></div>
+<div class="log" id="w8-log">The learner knows only the alphabet. Press <b>Next hypothesis ▸</b>.</div>
+<div class="cap">Angluin's L★, live, against a black box implementing a simplified race rule with the same shape as
+KataGo's (counting rows plus an absorbing ALIVE state — here: inner group starts with 3 liberties, ring with 6; the ring
+is read alive while it stays comfortably ahead, and permanently alive once the inner group hits atari). The learner
+asks only yes/no membership questions, proposes a machine, gets a counterexample, refines. When it converges, the states
+are laid out by the (inner, ring) liberty count each one corresponds to — a post-hoc placement the learner never saw,
+revealing that it reconstructed the counting lattice from answers alone. The held-out check at the end mirrors the
+paper's: thousands of random strings, zero disagreements. The real extraction, against the actual network, produced 19
+states from 28 forward passes.</div>
+<script>
+(function(){
+const EXC='#2E7D4F', INH='#B3402A', INK='#21241F', PAPER='#F7F6F1', NOTE='#2B4C7E', GRID='#CFCCC0';
+const A=['f','g'];
+// ---- oracle: simplified race rule (same shape as the paper's) ----
+// state: I inner liberties (start 3), R ring liberties (start 6), saturating at 0.
+// verdict: alive if I<=1 (absorbing) else R >= I + 2.
+function sim(s){let I=3,R=6;for(const ch of s){if(ch==='f')I=Math.max(0,I-1);else R=Math.max(0,R-1);}return[I,R];}
+const seen=new Set(); let MQ=0;
+function member(s){MQ++;const[I,R]=sim(s);seen.add(Math.min(I,1)===I&&I<=1?'ALIVE':I+','+R);
+  return I<=1?true:R>=I+2;}
+// ---- L* (classic Angluin) ----
+let S,E,T,hyps,cursor,finished;
+const row=s=>E.map(e=>T[s+e]?1:0).join('');
+function fill(){for(const s of [...S.flatMap(x=>[x,...A.map(a=>x+a)])])
+  for(const e of E)if(!(s+e in T))T[s+e]=member(s+e);}
+function closed(){const rows=new Set(S.map(row));
+  for(const s of S)for(const a of A)if(!rows.has(row(s+a)))return s+a;return null;}
+function consistent(){
+  for(let i=0;i<S.length;i++)for(let j=i+1;j<S.length;j++)
+    if(row(S[i])===row(S[j]))for(const a of A)if(row(S[i]+a)!==row(S[j]+a)){
+      for(const e of E)if(T[S[i]+a+e]!==T[S[j]+a+e])return a+e;}
+  return null;}
+function hypothesis(){
+  const reps={},states=[];
+  for(const s of S){const r=row(s);if(!(r in reps)){reps[r]=states.length;states.push(s);}}
+  const trans=states.map(s=>A.map(a=>reps[row(s+a)]));
+  const acc=states.map(s=>T[s]);
+  return{states,trans,acc};}
+function runH(h,s){let q=0;for(const ch of s)q=h.trans[q][A.indexOf(ch)];return h.acc[q];}
+function counterexample(h){
+  // deterministic-ish sweep then random
+  const rand=[];let seed=99;const rnd=()=>{seed=(seed*1103515245+12345)%2147483648;return seed/2147483648;};
+  for(let k=0;k<4000;k++){let n=Math.floor(rnd()*11),s='';
+    for(let i=0;i<n;i++)s+=A[rnd()<0.5?0:1];rand.push(s);}
+  for(const s of rand)if(runH(h,s)!==member(s))return s;
+  return null;}
+function lstar(){
+  S=[''];E=[''];T={};hyps=[];finished=false;
+  while(true){
+    fill();
+    let c;
+    while((c=closed())||(c=null,consistent())){
+      if(c){S.push(c);}else{E.push(consistent());}
+      fill();}
+    const h=hypothesis();
+    const cex=counterexample(h);
+    hyps.push({h:JSON.parse(JSON.stringify(h)),cex,mq:MQ,pos:seen.size});
+    if(!cex)break;
+    for(let i=1;i<=cex.length;i++){const p=cex.slice(0,i);if(!S.includes(p))S.push(p);}
+  }
+}
+// ---- rendering ----
+function el(n,at){const e=document.createElementNS('http://www.w3.org/2000/svg',n);
+  for(const k in at)e.setAttribute(k,at[k]);return e;}
+function draw(h,final){
+  const svg=document.getElementById('w8-svg');svg.innerHTML='';
+  // arrowhead markers, one per symbol color
+  const defs=el('defs',{});
+  [['arrF',NOTE],['arrG',INH],['arrS',INK]].forEach(([id,c])=>{
+    const m=el('marker',{id,viewBox:'0 0 10 10',refX:9,refY:5,markerWidth:6.5,markerHeight:6.5,
+      orient:'auto-start-reverse'});
+    m.appendChild(el('path',{d:'M 0 0 L 10 5 L 0 10 z',fill:c}));
+    defs.appendChild(m);});
+  svg.appendChild(defs);
+  // position each state by its semantic (I,R) — post hoc, learner never saw this
+  const pos=h.states.map(s=>{const[I,R]=sim(s);return I<=1?['A',R]:[I,R];});
+  const px=R=>760-R*105, py=I=>I==='A'?226:I===3?60:143;
+  const lab=(x,y,t,c,a,sz)=>{const e=el('text',{x,y,'font-size':sz||10.5,'font-family':'monospace',
+    fill:c||INK,'text-anchor':a||'middle'});e.textContent=t;svg.appendChild(e);};
+  if(final){lab(60,60,'I=3 row','#8a877c','start');lab(60,143,'I=2 row','#8a877c','start');
+    lab(60,226,'ALIVE (absorbing)','#8a877c','start');}
+  // transitions (endpoints pulled back to the circle edge so arrowheads land cleanly)
+  const R0=16;
+  h.states.forEach((s,i)=>{
+    h.trans[i].forEach((tq,ai)=>{
+      const[x1,y1]=[px(pos[i][1]),py(pos[i][0])],[x2,y2]=[px(pos[tq][1]),py(pos[tq][0])];
+      const mk=ai?'url(#arrG)':'url(#arrF)';
+      if(i===tq){ // self loop, arrowhead at return
+        svg.appendChild(el('path',{d:`M ${x1-9} ${y1-13} C ${x1-26} ${y1-38} ${x1+18} ${y1-38} ${x1+8} ${y1-14}`,
+          fill:'none',stroke:ai?INH:NOTE,'stroke-width':1.5,opacity:0.85,'marker-end':mk}));
+        return;}
+      const mx=(x1+x2)/2,my=(y1+y2)/2+(ai?18:-18);
+      // trim both ends: point on the quadratic near t=0/t=1 offset by circle radius
+      const trim=(ax,ay,bx,by,r)=>{const d=Math.hypot(bx-ax,by-ay)||1;
+        return[ax+(bx-ax)/d*r, ay+(by-ay)/d*r];};
+      const[sx,sy]=trim(x1,y1,mx,my,R0), [ex,ey]=trim(x2,y2,mx,my,R0+2.5);
+      svg.appendChild(el('path',{d:`M ${sx} ${sy} Q ${mx} ${my} ${ex} ${ey}`,
+        fill:'none',stroke:ai?INH:NOTE,'stroke-width':1.5,opacity:0.8,'marker-end':mk}));
+    });});
+  // start-state arrow (state 0 = access string ε, by construction)
+  {const x=px(pos[0][1]),y=py(pos[0][0]);
+   svg.appendChild(el('line',{x1:x-52,y1:y-30,x2:x-14,y2:y-9,stroke:INK,'stroke-width':1.6,
+     'marker-end':'url(#arrS)'}));
+   lab(x-56,y-34,'start',INK,'end',10.5);}
+  // states (accepting = conventional double circle, green)
+  h.states.forEach((s,i)=>{
+    const x=px(pos[i][1]),y=py(pos[i][0]);
+    if(h.acc[i])svg.appendChild(el('circle',{cx:x,cy:y,r:R0+3.5,fill:'none',stroke:EXC,'stroke-width':1.6}));
+    svg.appendChild(el('circle',{cx:x,cy:y,r:R0,fill:h.acc[i]?'#E4EFE7':PAPER,
+      stroke:h.acc[i]?EXC:INK,'stroke-width':h.acc[i]?2.2:1.6}));
+    lab(x,y+3.5,final?(pos[i][0]==='A'?'A':pos[i][0]+','+pos[i][1]):'q'+i,INK,'middle',10);
+  });
+  lab(400,252,`double ring = accepting ("read alive")   ·   →f (fill inner) blue   ·   →g (fill ring) rust   ·   arrow-in = start`,'#8a877c','middle');
+}
+// ---- UI ----
+let logEl=document.getElementById('w8-log');
+function logln(html){logEl.innerHTML+=html+'<br>';logEl.scrollTop=logEl.scrollHeight;}
+function show(k){
+  const{h,cex,mq,pos}=hyps[k];
+  document.getElementById('w8-mq').textContent=mq;
+  document.getElementById('w8-pos').textContent=pos;
+  document.getElementById('w8-st').textContent=h.states.length;
+  const final=!cex;
+  draw(h,final);
+  logln(`<span class="hyp">hypothesis ${k+1}:</span> ${h.states.length} state${h.states.length>1?'s':''}`+
+   (final?'':' — equivalence check…'));
+  if(cex)logln(`&nbsp;&nbsp;<span class="cex">counterexample: "${cex||'ε'}" — oracle says ${member(cex)?'alive':'dead'}, machine said ${runH(h,cex)?'alive':'dead'}. Refining…</span>`);
+  else{logln(`<span class="fin">converged — held-out check: 4,000 random strings, 0 disagreements. States now laid out by their (inner, ring) position — the lattice the learner reconstructed from yes/no answers alone.</span>`);
+    document.getElementById('w8-done').textContent='✓ extracted';
+    document.getElementById('w8-step').disabled=true;document.getElementById('w8-run').disabled=true;}
+}
+function reset(){MQ=0;seen.clear();lstar();cursor=-1;
+  logEl.innerHTML='The learner knows only the alphabet. Press <b>Next hypothesis ▸</b>.<br>';
+  document.getElementById('w8-mq').textContent='0';
+  document.getElementById('w8-pos').textContent='0';
+  document.getElementById('w8-st').textContent='—';
+  document.getElementById('w8-done').textContent='';
+  document.getElementById('w8-step').disabled=false;document.getElementById('w8-run').disabled=false;
+  document.getElementById('w8-svg').innerHTML='';}
+document.getElementById('w8-step').addEventListener('click',()=>{
+  if(cursor<hyps.length-1){cursor++;show(cursor);}});
+document.getElementById('w8-run').addEventListener('click',()=>{
+  while(cursor<hyps.length-1){cursor++;show(cursor);}});
+document.getElementById('w8-reset').addEventListener('click',reset);
+reset();
+})();
+</script>
+</div>
+<!--FRAGMENT END-->
+</body>
+</html>

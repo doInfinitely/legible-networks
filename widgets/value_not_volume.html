@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Interactive Figure 11 — Value, not volume</title>
+<style>body{background:#F7F6F1;margin:0;padding:24px;display:flex;justify-content:center}</style>
+</head>
+<body>
+<!--FRAGMENT START-->
+<div class="plate" id="w11-plate">
+<style>
+#w11-plate{--paper:#F7F6F1;--ink:#21241F;--exc:#2E7D4F;--inh:#B3402A;--grid:#CFCCC0;--note:#2B4C7E;--gold:#C89B3C;
+  font-family:Georgia,'Times New Roman',serif;color:var(--ink);background:var(--paper);
+  border:1px solid var(--ink);max-width:860px;margin:0 auto}
+#w11-plate .hd{display:flex;align-items:baseline;gap:12px;border-bottom:1px solid var(--ink);padding:10px 16px}
+#w11-plate .eyebrow{font-family:ui-monospace,Menlo,monospace;font-size:11px;letter-spacing:.18em;color:var(--note)}
+#w11-plate .title{font-size:17px;font-style:italic}
+#w11-plate .tabs{display:flex;border-bottom:1px solid var(--ink)}
+#w11-plate .tab{flex:1;font-family:ui-monospace,Menlo,monospace;font-size:12px;padding:8px;text-align:center;
+  cursor:pointer;background:var(--paper);border:none;border-right:1px solid var(--ink);color:var(--ink)}
+#w11-plate .tab:last-child{border-right:none}
+#w11-plate .tab[aria-selected="true"]{background:var(--ink);color:var(--paper)}
+#w11-plate .tab:focus-visible{outline:2px solid var(--note);outline-offset:-3px}
+#w11-plate .stage{padding:8px 16px 2px}
+#w11-plate svg{display:block;width:100%;height:auto}
+#w11-plate .ctl{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:6px 16px;
+  font-family:ui-monospace,Menlo,monospace;font-size:12px}
+#w11-plate button{font-family:ui-monospace,Menlo,monospace;font-size:12px;background:var(--paper);color:var(--ink);
+  border:1px solid var(--ink);padding:5px 12px;cursor:pointer}
+#w11-plate button:hover{background:var(--ink);color:var(--paper)}
+#w11-plate button:focus-visible{outline:2px solid var(--note);outline-offset:2px}
+#w11-plate .ro{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;min-height:44px;padding:2px 16px 8px;line-height:1.6}
+#w11-plate .ro .ok{color:var(--exc);font-weight:700}
+#w11-plate .ro .bad{color:var(--inh);font-weight:700}
+#w11-plate .cap{font-size:13px;line-height:1.5;padding:9px 16px 12px;border-top:1px dashed var(--grid);font-style:italic}
+#w11-plate .hidden{display:none}
+</style>
+<div class="hd"><span class="eyebrow">INTERACTIVE FIGURE 11</span><span class="title">Value, not volume — and the gain schedule with a hole in it</span></div>
+<div class="tabs" role="tablist">
+  <button class="tab" id="w11-tA" role="tab" aria-selected="true">A · value vs volume</button>
+  <button class="tab" id="w11-tB" role="tab" aria-selected="false">B · the gain schedule</button>
+</div>
+
+<div id="w11-panelA">
+<div class="stage"><svg id="w11-svgA" viewBox="0 0 800 250" role="img" aria-label="Value vs volume geometry"></svg></div>
+<div class="ctl">
+  <button id="w11-amp">amplify ×1.5 (volume)</button>
+  <button id="w11-patch">value patch (cross the boundary)</button>
+  <button id="w11-resetA">reset</button>
+</div>
+<div class="ro" id="w11-roA"></div>
+</div>
+
+<div id="w11-panelB" class="hidden">
+<div class="stage"><svg id="w11-svgB" viewBox="0 0 800 250" role="img" aria-label="Gain schedule"></svg></div>
+<div class="ctl">
+  <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+    <input type="checkbox" id="w11-eval"> overlay an on-distribution behavioral eval
+  </label>
+</div>
+<div class="ro" id="w11-roB"></div>
+</div>
+
+<div class="cap">Panel A: a consumer is a threshold on a feature's <i>value</i> — which side of the class boundary the
+state sits on. Amplifying the feature's own coordinate makes it louder without changing sides: the consumer's verdict
+never moves, while the disruption bill (KL) climbs — the measured version did exactly nothing at KL 0.33. A value patch
+crosses the boundary and flips the verdict at a fraction of the cost (measured: −0.0091 at KL 0.016, a 20× efficiency
+gap). Panel B: the same consumer's gain, context by context — healthy on ordinary positions (deleting the natural read
+costs 21% of crisis attention), near zero exactly on the cyclic exploit family. Tick the eval overlay to see why
+on-distribution behavioral evaluation certifies a model whose schedule has a hole in it: it only ever samples where the
+gain is healthy. Both panels are schematics of measured results; the numbers live in the text.</div>
+<script>
+(function(){
+const EXC='#2E7D4F', INH='#B3402A', INK='#21241F', PAPER='#F7F6F1', NOTE='#2B4C7E', GRID='#CFCCC0', GOLD='#C89B3C';
+function el(n,at){const e=document.createElementNS('http://www.w3.org/2000/svg',n);
+  for(const k in at)e.setAttribute(k,at[k]);return e;}
+function lab(svg,x,y,t,c,a,sz){const e=el('text',{x,y,'font-size':sz||11,'font-family':'monospace',
+  fill:c||INK,'text-anchor':a||'start'});e.textContent=t;svg.appendChild(e);return e;}
+// ---------- Panel A ----------
+const A={x:2.0, kl:0, patched:false};   // feature value (boundary at 0); start on "safe" side
+function drawA(){
+  const svg=document.getElementById('w11-svgA');svg.innerHTML='';
+  const X0=60,X1=740,YC=110, xs=v=>X0+(v+6)/12*(X1-X0);
+  // feature axis
+  svg.appendChild(el('line',{x1:X0,y1:YC,x2:X1,y2:YC,stroke:INK,'stroke-width':1.4}));
+  lab(svg,X1+2,YC+4,'w','#8a877c');
+  lab(svg,(X0+X1)/2,30,'the feature axis (the safety direction, schematically)','#8a877c','middle');
+  // boundary at 0
+  svg.appendChild(el('line',{x1:xs(0),y1:YC-64,x2:xs(0),y2:YC+64,stroke:INK,'stroke-width':2,'stroke-dasharray':'6 4'}));
+  lab(svg,xs(0),YC+84,'class boundary','#8a877c','middle');
+  lab(svg,xs(-3.2),YC-70,'reads “in crisis” → consumer acts',INH,'middle');
+  lab(svg,xs(3.2),YC-70,'reads “safe” → consumer quiet',EXC,'middle');
+  // consumer verdict box
+  const crisis=A.x<0;
+  svg.appendChild(el('rect',{x:X0,y:190,width:250,height:40,fill:'#fff',stroke:crisis?INH:EXC,'stroke-width':2}));
+  lab(svg,X0+125,206,'CONSUMER VERDICT',INK,'middle',10);
+  lab(svg,X0+125,222,crisis?'crisis — defend this chain':'safe — nothing to do',crisis?INH:EXC,'middle',12);
+  // KL meter
+  svg.appendChild(el('rect',{x:X1-250,y:190,width:250,height:40,fill:'#fff',stroke:GRID}));
+  lab(svg,X1-240,206,'disruption bill (KL)','#8a877c',undefined,10);
+  const klw=Math.min(230,A.kl*690);
+  svg.appendChild(el('rect',{x:X1-240,y:212,width:Math.max(1,klw),height:10,fill:A.kl>0.1?INH:NOTE}));
+  lab(svg,X1-240+klw+6,221,A.kl.toFixed(2),A.kl>0.1?INH:INK,undefined,10.5);
+  // the state point
+  svg.appendChild(el('line',{x1:xs(0),y1:YC,x2:xs(A.x),y2:YC,stroke:A.x<0?INH:EXC,'stroke-width':3,opacity:0.35}));
+  svg.appendChild(el('circle',{cx:xs(A.x),cy:YC,r:9,fill:A.x<0?INH:EXC,stroke:INK,'stroke-width':1.5}));
+  lab(svg,xs(A.x),YC-16,'state · w·h = '+A.x.toFixed(1),INK,'middle');
+}
+function roA(msg){document.getElementById('w11-roA').innerHTML=msg;}
+document.getElementById('w11-amp').addEventListener('click',()=>{
+  A.x*=1.5; A.kl+=0.11; drawA();
+  roA(`amplified: the feature is <b>louder</b> (w·h = ${A.x.toFixed(1)}) but on the <b>same side</b> of the boundary — the consumer's verdict is unchanged. <span class="bad">Effect ≈ 0, KL ${A.kl.toFixed(2)} and climbing</span> — the measured version: Δ = −0.0002 at KL 0.33. This is shouting.`);});
+document.getElementById('w11-patch').addEventListener('click',()=>{
+  A.x=-1.2; A.kl+=0.016; A.patched=true; drawA();
+  roA(`value patch: the state <b>crossed the boundary</b> — the consumer flips. <span class="ok">Effect at a fraction of the cost</span> — measured: −0.0091 at KL 0.016, ~20× the efficiency of any amplification. Consumers read the <b>value</b>, not the volume.`);});
+document.getElementById('w11-resetA').addEventListener('click',()=>{
+  A.x=2.0;A.kl=0;A.patched=false;drawA();
+  roA('a chain the axis currently reads as safe. Try both interventions.');});
+// ---------- Panel B ----------
+const CTX=[
+  {name:'ordinary positions',gain:0.85,note:'deleting the read costs 21% of crisis attention'},
+  {name:'race family (≤3 libs)',gain:0.6,note:'the working machine of post 4'},
+  {name:'race family (4–5 libs)',gain:0.15,note:'past the urgency horizon'},
+  {name:'cyclic exploit family',gain:0.02,note:'the hole the adversary plays in'}];
+function drawB(){
+  const svg=document.getElementById('w11-svgB');svg.innerHTML='';
+  const evalOn=document.getElementById('w11-eval').checked;
+  const X0=70,BW=140,GAP=35,Y1=190,H=150;
+  lab(svg,X0,24,'consumer gain, by context (schematic)','#8a877c');
+  CTX.forEach((c,i)=>{
+    const x=X0+i*(BW+GAP), h=c.gain*H;
+    svg.appendChild(el('rect',{x,y:Y1-h,width:BW,height:Math.max(2,h),
+      fill:c.gain>0.1?EXC:INH,opacity:0.85}));
+    lab(svg,x+BW/2,Y1-h-8,c.gain>0.1?('gain '+c.gain.toFixed(2)):'gain ≈ 0',
+        c.gain>0.1?EXC:INH,'middle',10.5);
+    lab(svg,x+BW/2,Y1+16,c.name,INK,'middle',10.5);
+    lab(svg,x+BW/2,Y1+30,c.note,'#8a877c','middle',9);
+    if(evalOn&&i===0){
+      svg.appendChild(el('rect',{x:x-10,y:Y1-H-24,width:BW+90,height:H+38,fill:'none',
+        stroke:GOLD,'stroke-width':2.5,'stroke-dasharray':'8 5'}));
+      lab(svg,x-4,Y1-H-32,'⌖ where the behavioral eval samples',GOLD,undefined,10.5);
+    }});
+  svg.appendChild(el('line',{x1:X0-14,y1:Y1,x2:X0+4*(BW+GAP)-GAP+14,y2:Y1,stroke:INK,'stroke-width':1.4}));
+  const ro=document.getElementById('w11-roB');
+  ro.innerHTML=evalOn
+    ?`the eval samples where the gain is healthy — <span class="ok">it passes</span> — and never touches the zero. <span class="bad">A gain-schedule hole is invisible to on-distribution evaluation by construction.</span> The adversary's whole job is to steer play into the rightmost bar.`
+    :`same feature, same wire, four contexts. The blind spot is not a missing circuit — it's the rightmost bar: a <b>zero in a learned gain schedule</b> attached to machinery that works everywhere else. Tick the overlay.`;
+}
+document.getElementById('w11-eval').addEventListener('change',drawB);
+// tabs
+function setTab(t){
+  document.getElementById('w11-tA').setAttribute('aria-selected',t==='A');
+  document.getElementById('w11-tB').setAttribute('aria-selected',t==='B');
+  document.getElementById('w11-panelA').classList.toggle('hidden',t!=='A');
+  document.getElementById('w11-panelB').classList.toggle('hidden',t!=='B');
+  if(t==='B')drawB();
+}
+document.getElementById('w11-tA').addEventListener('click',()=>setTab('A'));
+document.getElementById('w11-tB').addEventListener('click',()=>setTab('B'));
+drawA();roA('a chain the axis currently reads as safe. Try both interventions.');drawB();
+})();
+</script>
+</div>
+<!--FRAGMENT END-->
+</body>
+</html>

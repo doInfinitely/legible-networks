@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Interactive Figure 4 — The renorm spike</title>
+<style>body{background:#F7F6F1;margin:0;padding:24px;display:flex;justify-content:center}</style>
+</head>
+<body>
+<!--FRAGMENT START-->
+<div class="plate" id="w4-plate">
+<style>
+#w4-plate{--paper:#F7F6F1;--ink:#21241F;--exc:#2E7D4F;--inh:#B3402A;--grid:#CFCCC0;--note:#2B4C7E;
+  font-family:Georgia,'Times New Roman',serif;color:var(--ink);background:var(--paper);
+  border:1px solid var(--ink);max-width:860px;margin:0 auto}
+#w4-plate .hd{display:flex;align-items:baseline;gap:12px;border-bottom:1px solid var(--ink);padding:10px 16px}
+#w4-plate .eyebrow{font-family:ui-monospace,Menlo,monospace;font-size:11px;letter-spacing:.18em;color:var(--note)}
+#w4-plate .title{font-size:17px;font-style:italic}
+#w4-plate .sec{padding:14px 16px 6px}
+#w4-plate .sec h4{font-family:ui-monospace,Menlo,monospace;font-size:12px;font-weight:400;margin:0 0 8px;letter-spacing:.05em}
+#w4-plate .sec h4 b{font-weight:700}
+#w4-plate svg{display:block;width:100%;height:auto}
+#w4-plate .ctl{display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  font-family:ui-monospace,Menlo,monospace;font-size:12px;margin:6px 0 4px}
+#w4-plate input[type=range]{flex:1;min-width:140px;accent-color:#2B4C7E}
+#w4-plate .ro{font-family:ui-monospace,Menlo,monospace;font-size:12px;min-height:20px;padding:2px 0 4px}
+#w4-plate .warn{color:var(--inh);font-weight:700}
+#w4-plate .seg{border-top:1px dashed var(--grid)}
+#w4-plate .modes{display:flex;gap:0;border:1px solid var(--ink);width:fit-content;margin-bottom:8px}
+#w4-plate .modes button{font-family:ui-monospace,Menlo,monospace;font-size:12px;background:var(--paper);
+  color:var(--ink);border:none;border-right:1px solid var(--ink);padding:5px 12px;cursor:pointer}
+#w4-plate .modes button:last-child{border-right:none}
+#w4-plate .modes button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+#w4-plate .modes button:focus-visible{outline:2px solid var(--note);outline-offset:-3px}
+#w4-plate .cap{font-size:13px;line-height:1.5;padding:9px 16px 12px;border-top:1px dashed var(--grid);font-style:italic}
+</style>
+<div class="hd"><span class="eyebrow">INTERACTIVE FIGURE 4</span><span class="title">The renorm spike — why carving is deletion <b>plus</b> forced renormalization</span></div>
+
+<div class="sec">
+<h4>A · one P row under pruning &nbsp;—&nbsp; survivors must re-sum to <b>1.0</b></h4>
+<svg id="w4-svgA" viewBox="0 0 800 150" role="img" aria-label="Single row renormalization"></svg>
+<div class="ctl"><span>edges kept</span>
+  <input type="range" id="w4-k" min="1" max="12" value="12" aria-label="edges kept">
+  <span id="w4-kv" style="min-width:2ch">12</span></div>
+<div class="ro" id="w4-roA"></div>
+</div>
+
+<div class="sec seg">
+<h4>B · four rows, one shared budget &nbsp;—&nbsp; who decides where it goes?</h4>
+<div class="modes" role="group" aria-label="allocation mode">
+  <button id="w4-mG" aria-pressed="true">global top-k sort&ensp;(textbook)</button>
+  <button id="w4-mB" aria-pressed="false">balanced per row&ensp;(containment)</button>
+</div>
+<svg id="w4-svgB" viewBox="0 0 800 240" role="img" aria-label="Four-row allocation comparison"></svg>
+<div class="ctl"><span>total edge budget</span>
+  <input type="range" id="w4-B" min="4" max="48" value="16" aria-label="total budget">
+  <span id="w4-Bv" style="min-width:2ch">16</span><span>of 48</span></div>
+<div class="ro" id="w4-roB"></div>
+</div>
+
+<div class="cap">Legality forces every surviving P row to renormalize back to Σ = 1, so pruning an entry doesn't just remove
+its contribution — it <b>inflates every survivor by 1/m</b> (m = the mass that was kept). Panel A: drag the slider to
+one surviving edge and that synapse becomes a full-strength wire; on the fixed input shown, the neuron's activation
+jumps far above anything downstream weights were trained to receive. Panel B is why the textbook saliency score goes
+<i>below random</i>: a global sort lets one hot row hoard the budget while the others starve down to their single forced
+entry and spike (rust bars = renorm factor). Balanced allocation, same budget, keeps every factor near 1. Starved rows
+aren't lossy — they're toxic.</div>
+<script>
+(function(){
+const EXC='#2E7D4F', INH='#B3402A', INK='#21241F', PAPER='#F7F6F1', NOTE='#2B4C7E';
+function el(n,at){const e=document.createElementNS('http://www.w3.org/2000/svg',n);
+  for(const k in at)e.setAttribute(k,at[k]);return e;}
+let seed=7; function rnd(){seed=(seed*1103515245+12345)%2147483648;return seed/2147483648;}
+// ---------- Panel A: one row of 12, fixed activations ----------
+const NA=12;
+let pA=Array.from({length:NA},()=>Math.exp((rnd()*2-1)*1.1));
+{const s=pA.reduce((a,b)=>a+b,0);pA=pA.map(v=>v/s);}
+const aA=Array.from({length:NA},()=>0.15+0.7*rnd());       // fixed input activations in [0,1]
+const orderA=[...Array(NA).keys()].sort((x,y)=>pA[y]-pA[x]); // prune smallest first
+const z0=pA.reduce((s,p,i)=>s+p*aA[i],0);
+function renderA(k){
+  const keep=new Set(orderA.slice(0,k));
+  const m=[...keep].reduce((s,i)=>s+pA[i],0);
+  const svg=document.getElementById('w4-svgA'); svg.innerHTML='';
+  const bx=40,bw=720,y1=28,y2=92,h=26;
+  const lab=(x,y,t,c,anchor)=>{const e=el('text',{x,y,'font-size':11.5,'font-family':'monospace',
+     fill:c||INK,'text-anchor':anchor||'start'});e.textContent=t;svg.appendChild(e);};
+  lab(bx,y1-8,'trained row  ·  Σ = 1.000');
+  let acc=0;
+  for(const i of [...Array(NA).keys()]){
+    const wpx=pA[i]*bw, dead=!keep.has(i);
+    svg.appendChild(el('rect',{x:bx+acc,y:y1,width:Math.max(0.5,wpx),height:h,
+      fill:dead?'#DDDACF':EXC,stroke:PAPER,'stroke-width':1}));
+    if(wpx>26)lab(bx+acc+wpx/2,y1+h/2+4,pA[i].toFixed(2),dead?'#8a877c':PAPER,'middle');
+    acc+=wpx;}
+  svg.appendChild(el('rect',{x:bx,y:y1,width:bw,height:h,fill:'none',stroke:INK,'stroke-width':1.2}));
+  lab(bx,y2-8,`carved row  ·  survivors ÷ m,  m = ${m.toFixed(3)}  →  ×${(1/m).toFixed(2)} each  ·  Σ = 1.000 again`);
+  acc=0;
+  for(const i of orderA.slice(0,k)){
+    const w=pA[i]/m, wpx=w*bw;
+    svg.appendChild(el('rect',{x:bx+acc,y:y2,width:Math.max(0.5,wpx),height:h,
+      fill:EXC,stroke:PAPER,'stroke-width':1}));
+    if(wpx>30)lab(bx+acc+wpx/2,y2+h/2+4,w.toFixed(2),PAPER,'middle');
+    acc+=wpx;}
+  svg.appendChild(el('rect',{x:bx,y:y2,width:bw,height:h,fill:'none',stroke:INK,'stroke-width':1.2}));
+  svg.appendChild(el('line',{x1:bx+bw,y1:y1-4,x2:bx+bw,y2:y2+h+4,stroke:INK,'stroke-width':2}));
+  lab(bx+bw+6,y2+h/2,'1.0');
+  const z1=orderA.slice(0,k).reduce((s,i)=>s+(pA[i]/m)*aA[i],0);
+  const ratio=z1/z0;
+  const ro=document.getElementById('w4-roA');
+  ro.innerHTML=`activation on the fixed input:  z = ${z0.toFixed(3)} (trained)  →  ${z1.toFixed(3)} (carved)   ·   ×${ratio.toFixed(2)}`+
+    (k===1?`   <span class="warn">← this synapse IS the neuron now: a full-strength wire copying one input</span>`
+     :(1/m>2?`   <span class="warn">renorm factor 1/m = ${(1/m).toFixed(1)} — downstream weights never trained for this</span>`:''));
+}
+// ---------- Panel B: 4 rows x 12, allocation modes ----------
+const NR=4;
+let rows=[];
+for(let r=0;r<NR;r++){
+  // row 0 is "hot": bigger raw pre-normalization scale so a global saliency-ish sort favors it
+  const heat=r===0?3.2:1.0;
+  let p=Array.from({length:NA},()=>heat*Math.exp((rnd()*2-1)*1.0));
+  rows.push(p);}
+const scores=rows.map(p=>p.map(v=>v));   // score = raw magnitude proxy (row-scaled -> hot row hoards)
+const rowsN=rows.map(p=>{const s=p.reduce((a,b)=>a+b,0);return p.map(v=>v/s);});
+let modeB='G';
+function alloc(budget){
+  const keep=rowsN.map(()=>new Set());
+  if(modeB==='G'){
+    const all=[];
+    for(let r=0;r<NR;r++)for(let i=0;i<NA;i++)all.push([scores[r][i],r,i]);
+    all.sort((a,b)=>b[0]-a[0]);
+    // forced legality first: each row keeps its top entry
+    for(let r=0;r<NR;r++){const top=rowsN[r].indexOf(Math.max(...rowsN[r]));keep[r].add(top);}
+    let used=NR;
+    for(const[,r,i]of all){if(used>=budget)break;if(!keep[r].has(i)){keep[r].add(i);used++;}}
+  }else{
+    const per=Math.max(1,Math.floor(budget/NR));let extra=budget-per*NR;
+    for(let r=0;r<NR;r++){
+      const ord=[...Array(NA).keys()].sort((x,y)=>rowsN[r][y]-rowsN[r][x]);
+      const take=per+(extra-->0?1:0);
+      ord.slice(0,Math.min(NA,take)).forEach(i=>keep[r].add(i));}
+  }
+  return keep;
+}
+function renderB(){
+  const budget=+document.getElementById('w4-B').value;
+  const keep=alloc(budget);
+  const svg=document.getElementById('w4-svgB');svg.innerHTML='';
+  const bx=40,bw=520,h=20,gap=36,fx=bx+bw+34,fw=170;
+  const lab=(x,y,t,c,anchor)=>{const e=el('text',{x,y,'font-size':11,'font-family':'monospace',
+     fill:c||INK,'text-anchor':anchor||'start'});e.textContent=t;svg.appendChild(e);};
+  lab(bx,16,'row  (grey = pruned)');lab(fx,16,'renorm factor 1/m');
+  let worst=1;
+  for(let r=0;r<NR;r++){
+    const y=30+r*(h+gap);
+    const m=[...keep[r]].reduce((s,i)=>s+rowsN[r][i],0);
+    worst=Math.max(worst,1/m);
+    lab(bx-6,y+h/2+4,'r'+(r+1)+(r===0?'*':''),INK,'end');
+    let acc=0;
+    for(let i=0;i<NA;i++){
+      const wpx=rowsN[r][i]*bw,dead=!keep[r].has(i);
+      svg.appendChild(el('rect',{x:bx+acc,y,width:Math.max(0.5,wpx),height:h,
+        fill:dead?'#DDDACF':EXC,stroke:PAPER,'stroke-width':1}));
+      acc+=wpx;}
+    svg.appendChild(el('rect',{x:bx,y,width:bw,height:h,fill:'none',stroke:INK,'stroke-width':1}));
+    // renorm factor bar (log-ish scale up to 50x)
+    const f=1/m, fl=Math.min(1,Math.log(f)/Math.log(50));
+    svg.appendChild(el('rect',{x:fx,y,width:Math.max(2,fl*fw),height:h,
+      fill:f>2?INH:NOTE,opacity:0.9}));
+    lab(fx+Math.max(2,fl*fw)+6,y+h/2+4,'×'+f.toFixed(f>10?0:1),f>2?INH:INK);
+    lab(bx,y+h+13,`kept ${keep[r].size}/12 · m = ${m.toFixed(3)}`,'#8a877c');
+  }
+  lab(bx-6,30+NR*(h+gap)-10,'* the "hot" row a global score favors','#8a877c');
+  const ro=document.getElementById('w4-roB');
+  ro.innerHTML=modeB==='G'
+    ?(worst>2?`worst renorm factor <span class="warn">×${worst.toFixed(1)}</span> — starved rows fire ~${worst.toFixed(0)}× above trained scale into weights that never saw it`
+             :`budget still generous — drag it down to watch the hot row start hoarding`)
+    :`worst renorm factor ×${worst.toFixed(1)} — balanced allocation keeps every row near its trained scale at the same total budget`;
+}
+document.getElementById('w4-k').addEventListener('input',e=>{
+  document.getElementById('w4-kv').textContent=e.target.value;renderA(+e.target.value);});
+document.getElementById('w4-B').addEventListener('input',e=>{
+  document.getElementById('w4-Bv').textContent=e.target.value;renderB();});
+document.getElementById('w4-mG').addEventListener('click',()=>{modeB='G';
+  document.getElementById('w4-mG').setAttribute('aria-pressed',true);
+  document.getElementById('w4-mB').setAttribute('aria-pressed',false);renderB();});
+document.getElementById('w4-mB').addEventListener('click',()=>{modeB='B';
+  document.getElementById('w4-mG').setAttribute('aria-pressed',false);
+  document.getElementById('w4-mB').setAttribute('aria-pressed',true);renderB();});
+renderA(12);renderB();
+})();
+</script>
+</div>
+<!--FRAGMENT END-->
+</body>
+</html>

@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Interactive Figure 10 — The tier diagnostic, computed live</title>
+<style>body{background:#F7F6F1;margin:0;padding:24px;display:flex;justify-content:center}</style>
+</head>
+<body>
+<!--FRAGMENT START-->
+<div class="plate" id="w10-plate">
+<style>
+#w10-plate{--paper:#F7F6F1;--ink:#21241F;--exc:#2E7D4F;--inh:#B3402A;--grid:#CFCCC0;--note:#2B4C7E;--gold:#C89B3C;
+  font-family:Georgia,'Times New Roman',serif;color:var(--ink);background:var(--paper);
+  border:1px solid var(--ink);max-width:860px;margin:0 auto}
+#w10-plate .hd{display:flex;align-items:baseline;gap:12px;border-bottom:1px solid var(--ink);padding:10px 16px}
+#w10-plate .eyebrow{font-family:ui-monospace,Menlo,monospace;font-size:11px;letter-spacing:.18em;color:var(--note)}
+#w10-plate .title{font-size:17px;font-style:italic}
+#w10-plate .ctl{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:12px 16px 4px;
+  font-family:ui-monospace,Menlo,monospace;font-size:12px}
+#w10-plate label{display:flex;align-items:center;gap:5px;cursor:pointer}
+#w10-plate button{font-family:ui-monospace,Menlo,monospace;font-size:12px;background:var(--paper);color:var(--ink);
+  border:1px solid var(--ink);padding:4px 12px;cursor:pointer}
+#w10-plate button:hover:not(:disabled){background:var(--ink);color:var(--paper)}
+#w10-plate button:disabled{opacity:.4;cursor:default}
+#w10-plate button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+#w10-plate .stage{padding:6px 16px}
+#w10-plate svg{display:block;width:100%;height:auto}
+#w10-plate .status{font-family:ui-monospace,Menlo,monospace;font-size:12px;min-height:20px;padding:2px 16px 10px}
+#w10-plate .cap{font-size:13px;line-height:1.5;padding:9px 16px 12px;border-top:1px dashed var(--grid);font-style:italic}
+</style>
+<div class="hd"><span class="eyebrow">INTERACTIVE FIGURE 10</span><span class="title">The tier diagnostic — three Chomsky tiers from one instrument, computed live</span></div>
+<div class="ctl">
+  <label><input type="checkbox" id="w10-p1" checked> <span style="color:#2B4C7E">■</span> length parity (regular)</label>
+  <label><input type="checkbox" id="w10-p2" checked> <span style="color:#2E7D4F">■</span> depth &gt; 1 (counter)</label>
+  <label><input type="checkbox" id="w10-p3" checked> <span style="color:#B3402A">■</span> Dyck-2 valid-so-far (stack)</label>
+  <button id="w10-log" aria-pressed="false">log scale</button>
+  <button id="w10-l5">compute stack L=5 (a few seconds)</button>
+</div>
+<div class="stage"><svg id="w10-svg" viewBox="0 0 800 300" role="img" aria-label="States vs horizon"></svg></div>
+<div class="status" id="w10-status">computing in your browser…</div>
+<div class="cap">The instrument: for each predicate, count prefixes that some shared continuation provably distinguishes —
+a Myhill–Nerode-style lower bound on the states of any deterministic machine consistent with the verdicts up to
+horizon L. Nothing here is canned: the bound is recomputed in your browser (the status line counts oracle evaluations).
+Regular predicates come out flat, counters linear, stacks doubling — press <i>log scale</i> and the doubling row becomes
+a straight line, the geometric signature of "the distinguishable prefixes are the reachable stack contents." This is the
+calibration table from §1; the same instrument, pointed at the model's internal directions, is what certifies the depth
+counter and grades the soft stack.</div>
+<script>
+(function(){
+const NOTE='#2B4C7E', EXC='#2E7D4F', INH='#B3402A', INK='#21241F', GRID='#CFCCC0';
+let evals=0;
+function bound(alphabet, f, L){
+  let prefixes=[''],frontier=[''];
+  for(let n=1;n<=L;n++){const next=[];
+    for(const p of frontier)for(const a of alphabet)next.push(p+a);
+    prefixes.push(...next);frontier=next;}
+  const memo=new Map();
+  const F=s=>{if(!memo.has(s)){memo.set(s,f(s));evals++;}return memo.get(s);};
+  function disting(u,v){
+    let ws=[''];
+    for(let n=0;n<=L;n++){
+      for(const w of ws)if(F(u+w)!==F(v+w))return true;
+      if(n<L){const nx=[];for(const w of ws)for(const a of alphabet)nx.push(w+a);ws=nx;}}
+    return false;}
+  const D=[];
+  for(const u of prefixes)if(D.every(v=>disting(u,v)))D.push(u);
+  return D.length;
+}
+const parity=s=>s.length%2===0;
+function d1(s){let d=0;for(const c of s){d+=c==='('?1:-1;if(d<0)return null;}return d;}
+const depthGT1=s=>{const d=d1(s);return d!==null&&d>1;};
+function dyck2(s){const st=[];for(const c of s){
+  if(c==='('||c==='[')st.push(c);
+  else{const o=st.pop();if(!o||(c===')'&&o!=='(')||(c===']'&&o!=='['))return false;}}return true;}
+// series: computed lazily
+const S={
+  p1:{color:NOTE,label:'parity',pts:null,
+      compute:()=>[1,2,3,4,5,6,7,8].map(L=>[L,bound(['(',')'],parity,L)])},
+  p2:{color:EXC,label:'depth>1',pts:null,
+      compute:()=>[1,2,3,4,5,6,7,8,9].map(L=>[L,bound(['(',')'],depthGT1,L)])},
+  p3:{color:INH,label:'Dyck-2 valid',pts:null,
+      compute:()=>[1,2,3,4].map(L=>[L,bound(['(','[',')',']'],dyck2,L)])}};
+let logScale=false;
+function el(n,at){const e=document.createElementNS('http://www.w3.org/2000/svg',n);
+  for(const k in at)e.setAttribute(k,at[k]);return e;}
+function draw(){
+  const svg=document.getElementById('w10-svg');svg.innerHTML='';
+  const X0=52,X1=780,Y0=18,Y1=262;
+  const act=['p1','p2','p3'].filter(k=>document.getElementById('w10-'+k).checked&&S[k].pts);
+  let maxL=9,maxY=4;
+  act.forEach(k=>S[k].pts.forEach(([L,y])=>{maxL=Math.max(maxL,L);maxY=Math.max(maxY,y);}));
+  const xs=L=>X0+(L-1)/(maxL-1)*(X1-X0);
+  const ys=v=>logScale?Y1-(Math.log2(v))/(Math.log2(maxY)||1)*(Y1-Y0)
+                      :Y1-(v-0)/(maxY)*(Y1-Y0);
+  const lab=(x,y,t,c,a)=>{const e=el('text',{x,y,'font-size':10.5,'font-family':'monospace',
+    fill:c||INK,'text-anchor':a||'start'});e.textContent=t;svg.appendChild(e);};
+  svg.appendChild(el('rect',{x:X0,y:Y0,width:X1-X0,height:Y1-Y0,fill:'#FFFFFF',stroke:GRID}));
+  // gridlines
+  const ticks=logScale?[1,2,4,8,16,32,64].filter(v=>v<=maxY):
+    [...Array(6)].map((_,i)=>Math.round(maxY*i/5)).filter((v,i,a)=>v>0&&a.indexOf(v)===i);
+  ticks.forEach(v=>{svg.appendChild(el('line',{x1:X0,y1:ys(v),x2:X1,y2:ys(v),stroke:GRID,'stroke-width':0.6}));
+    lab(X0-5,ys(v)+3,String(v),'#8a877c','end');});
+  for(let L=1;L<=maxL;L++)lab(xs(L),Y1+14,String(L),'#8a877c','middle');
+  lab((X0+X1)/2,Y1+28,'horizon L (max string length)','#8a877c','middle');
+  lab(14,Y0+8,'states (lower bound)','#8a877c');
+  act.forEach(k=>{
+    const s=S[k];let d='';
+    s.pts.forEach(([L,y],i)=>{d+=(i?'L':'M')+xs(L)+','+ys(y);});
+    svg.appendChild(el('path',{d,fill:'none',stroke:s.color,'stroke-width':2.2}));
+    s.pts.forEach(([L,y])=>{
+      svg.appendChild(el('circle',{cx:xs(L),cy:ys(y),r:3.6,fill:s.color}));
+      lab(xs(L),ys(y)-8,String(y),s.color,'middle');});
+    const last=s.pts[s.pts.length-1];
+    lab(Math.min(xs(last[0])+8,X1-60),ys(last[1])+4,s.label,s.color);
+  });
+}
+function compute(){
+  const t0=performance.now();
+  ['p1','p2','p3'].forEach(k=>{if(!S[k].pts)S[k].pts=S[k].compute();});
+  draw();
+  document.getElementById('w10-status').textContent=
+    `computed in-browser: ${evals.toLocaleString()} oracle evaluations · ${(performance.now()-t0).toFixed(0)} ms · parity ${S.p1.pts.map(p=>p[1]).join(',')} — depth>1 ${S.p2.pts.map(p=>p[1]).join(',')} — Dyck-2 ${S.p3.pts.map(p=>p[1]).join(',')}`;
+}
+['p1','p2','p3'].forEach(k=>document.getElementById('w10-'+k).addEventListener('change',draw));
+document.getElementById('w10-log').addEventListener('click',e=>{logScale=!logScale;
+  e.target.setAttribute('aria-pressed',logScale);draw();});
+document.getElementById('w10-l5').addEventListener('click',e=>{
+  e.target.disabled=true;e.target.textContent='computing L=5…';
+  document.getElementById('w10-status').textContent='computing Dyck-2 at L=5 — this genuinely takes a few seconds…';
+  setTimeout(()=>{const t0=performance.now();
+    S.p3.pts.push([5,bound(['(','[',')',']'],dyck2,5)]);
+    draw();
+    e.target.textContent='stack L=5 ✓ (doubling continues)';
+    document.getElementById('w10-status').textContent=
+      `Dyck-2 L=5: ${S.p3.pts[S.p3.pts.length-1][1]} states · ${((performance.now()-t0)/1000).toFixed(1)} s · the doubling is real, not an artifact of a short horizon`;
+  },30);});
+setTimeout(compute,30);
+})();
+</script>
+</div>
+<!--FRAGMENT END-->
+</body>
+</html>
