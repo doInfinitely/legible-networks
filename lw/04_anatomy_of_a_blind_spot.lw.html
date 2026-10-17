@@ -1,0 +1,183 @@
+<p><em>Post 4 of the <strong>Legible Networks</strong> series (<a href="https://doinfinitely.github.io/legible-networks/03-your-network-is-already-a-unit-net.html">post 3</a> built the exact reconstruction this runs on). Sources: the writeups</em> Anatomy of a Blind Spot <em>and</em> From Networks to Automata <em>in the <code>explainable_ai</code> repo, plus the KataGo lab notes. Interactive figures continue the series numbering.</em></p>
+<p><em>The whole series is also readable as a <a href="https://doinfinitely.github.io/legible-networks/">self-contained site</a> with the interactive figures embedded inline.</em></p>
+<p><strong>Epistemic status:</strong> the mechanistic chain is verified at each link (behavioral → causal → exact automaton → certified absence), with a designed control paired to every positive claim, and replication across three model scales (~30× parameter range). "Complete mechanism" is a strong phrase; we use it because every stage from input to failure is accounted for. The certification of <em>absence</em> is inherently a certification against the probe class used — channels and all linear directions — and we say so where it matters.</p>
+<hr />
+<h2>The puzzle</h2>
+<p>In 2022, <a href="https://arxiv.org/abs/2211.00241">Wang et al.</a> showed that adversarial policies far weaker than any professional player can defeat KataGo — the strongest open Go program, hundreds of Elo beyond any human — by maneuvering it into positions where one of its large ring-shaped ("cyclic") groups is dead while the program evaluates it as alive, and therefore never defends it. Human amateurs see the capture instantly. It became the canonical example of a superhuman network with an exploitable blind spot.</p>
+<p>Which poses a question nobody had answered: <em>what, mechanistically, is wrong inside the network?</em></p>
+<p>Some Go vocabulary, since the whole post runs on four concepts. A group's <strong>liberties</strong> are the empty points adjacent to it — run out and the group is captured. An <strong>eye</strong> is an enclosed empty point inside a group; a group with <strong>two eyes</strong> can never be captured (the opponent can't fill both), which is the criterion for being unconditionally <strong>alive</strong>. A <strong>capturing race</strong> is two adjacent groups trying to fill each other's liberties first — a counting fight. KataGo's network has a trunk (a residual conv net — the one post 3 transplanted to 99.97% legality) feeding several heads: a <strong>policy</strong> head (a probability distribution over moves — where to look), a <strong>value</strong> head (who's winning), and an <strong>ownership</strong> head (for every board point, a prediction in [−1, +1] of who finally owns it — this is where we read the network's belief about a group's life). At play time, <a href="https://en.wikipedia.org/wiki/Monte_Carlo_tree_search">MCTS</a> (Monte Carlo tree search) explores moves <em>proposed by the policy</em> and evaluates them with the value head — remember that dependency; it's load-bearing.</p>
+<p>Working on the exactly function-preserving reconstruction from post 3 (fixed-unit path masses are what make the channel sweeps and direction analyses comparable at all), we traced the failure end to end. The punchline inverts the usual adversarial-example story:</p>
+<blockquote>
+<p><strong>The vulnerability is not a fragile feature an attacker perturbs; it is a hole. Nothing is fooled — something was never learned.</strong></p>
+</blockquote>
+<h2>1. Confidently, in-distribution wrong</h2>
+<p>First, establish the phenomenon under controlled conditions. On <em>status boards</em> (settled groups whose life/death is known by construction), the b10 network reads dead groups as alive in <strong>18/20 evaluations</strong> — mean ownership +0.67 where truth is −1 — and is <em>most</em> confident on exactly the boards most like the exploit (large one-eyed dead groups: +0.99).</p>
+<p>Two natural excuses both fail their tests. The first excuse would be <em>generic value-head gullibility</em>: KataGo and Leela Chess Zero are both AlphaZero-style networks trained the same way (self-play, a value head predicting the game outcome), so maybe such value heads just systematically over-price big, material-heavy positions — "lots of stones, must be winning" — and the cyclic misread is one instance of a family-wide bias. A companion study rules that out: the same methodology applied to Leela on tablebase-graded chess endgames shows its value head correctly pricing exactly the deceptive cases the hypothesis predicts it should botch — material imbalances that look winning but are provably drawn. Self-play value heads <em>can</em> learn "impressive-looking but actually dead"; this one didn't learn it for Go groups specifically. And it's not an out-of-distribution excursion: the distance of internal activations from the self-play distribution is <em>lower</em> on misread positions (1.42) than on correctly-read ones (1.76). The network is <strong>confidently, in-distribution wrong</strong> — foreshadowing: one cannot look anomalous in a representation one lacks.</p>
+<h2>2. The urgency horizon</h2>
+<p>The <em>race boards</em> — a 27-stone white ring with a parameterized number of liberties, racing an inner black group, on a globally balanced board<sup id="fnref:families"><a class="footnote-ref" href="#fn:families">1</a></sup> — localize the behavioral failure. Measure the probability mass the raw policy puts on the <em>critical moves</em> (the liberties of the two racing groups — the only correct moves in a live race), the fraction of a 200-visit search's visits that land on those same moves, and the ring ownership read:</p>
+<table>
+<thead>
+<tr>
+<th>ring liberties</th>
+<th>policy mass on race moves</th>
+<th>search visit mass on race moves (200 visits)</th>
+<th>ring read</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2</td>
+<td>0.994</td>
+<td>0.824</td>
+<td>−0.90 (dead — correct)</td>
+</tr>
+<tr>
+<td>3</td>
+<td>0.160</td>
+<td>0.926</td>
+<td>+0.93 (misread)</td>
+</tr>
+<tr>
+<td>4</td>
+<td>0.009</td>
+<td>0.000</td>
+<td>+0.95</td>
+</tr>
+<tr>
+<td>5–7</td>
+<td>~0.002</td>
+<td>~0.000</td>
+<td>+0.96 to +0.99</td>
+</tr>
+</tbody>
+</table>
+<p>Three regimes. At 2 liberties the policy solves the race outright. At 3, the evaluation has already flipped but search still rescues the position (0.926) — the policy proposes <em>just enough</em>. At 4 and beyond the failure is <strong>systemic</strong>: the policy proposes nothing in the critical region, so search — which only ever expands the policy's proposals — never examines the killing lines, while the value head blesses the result. The misread and the attention collapse are coupled (r = −0.41 across all conditions), and the leaked probability mass flows to ordinary big moves elsewhere: the vacuum left by a missing urgency signal, filled by default behavior.</p>
+<!--WIDGET:urgency_horizon-->
+<blockquote>
+<p>🕹️ <strong>Interactive Figure 7 — <a href="https://doinfinitely.github.io/legible-networks/widgets/urgency_horizon.html">The urgency horizon</a>.</strong> A stylized race board (white ring, inner black group, critical moves marked) with a liberty slider — and the <em>measured</em> b10 curves tracking it. Watch the policy's mass on the race moves evaporate between 2 and 4 liberties while the ownership read flips to confidently-alive, and note the one-column window where search still saves it. This is the exploit's operating principle from the inside: keep the ring above the victim's horizon and the victim will not spend moves on the race, will not search it, and will not fear it.</p>
+</blockquote>
+<p>This also explains the attack's notorious robustness to search depth: search amplifies proposals, and a policy that proposes nothing starves it.</p>
+<p><img alt="The urgency horizon, measured" src="https://doinfinitely.github.io/legible-networks/images/post4/fig1_horizon.png" />
+<em>Figure — the measured horizon (b10, race family): policy and 200-visit search mass on the critical moves (A), and the ring ownership read flipping at the same boundary (B).</em></p>
+<h2>3. The misread is causally steerable</h2>
+<p>Is the misjudgment merely correlated with some internal state, or driven by one? The race boards at 2 vs 4–5 liberties differ by only a few stones, so the <em>difference of their internal stream states</em> is a purified <strong>urgency direction</strong>. Injecting it at a middle block while evaluating the blind boards:</p>
+<ul>
+<li>race attention returns dose-dependently: <strong>0.009 → 0.579</strong> (race-4), 0.002 → 0.510 (race-5);</li>
+<li>the life-misread partially corrects <em>with</em> it: ring read +0.95 → −0.18 — urgency and life/death are entangled in one late-trunk representation;</li>
+<li>a permuted-channel control of identical magnitude does nothing (≤ 0.004).</li>
+</ul>
+<p>So the race-playing machinery <em>exists</em> and fires when the signal it gates on is supplied externally; what's missing is upstream.</p>
+<p>Two honest caveats from the writeup, kept because they teach something. First, <strong>steering isn't free where the signal already exists</strong>: apply the same injection to a board that's <em>already</em> urgent (2 ring liberties, policy correctly at 0.994 on the race) and the race attention <em>drops</em> to 0.509 — adding "urgency" on top of present urgency overshoots and degrades the correct behavior. An added constant vector helps exactly where the signal is missing and harms where it isn't; a real repair would have to be conditional, which a constant is not.</p>
+<p>Second, <strong>the steering vector was a blend of two distinct signals</strong> — and unpacking this resolves an apparent paradox. The vector was built as a difference of internal states between 2-liberty and 4–5-liberty boards. But those boards differ in <em>two</em> ways at once: the race's urgency <strong>and</strong> the ring's life/death status (at 2 liberties the ring is genuinely dead; at 4–5 it's read alive). So the difference vector contains an urgency component <em>and</em> a verdict component. The post-hoc check: construct a cleaner urgency contrast on the <em>defender</em> side, where liberties vary but the outcome doesn't ("outcome-constant"), and compare it to §5's verdict axis — they're orthogonal (cosine −0.05, inside the permutation null<sup id="fnref:permnull"><a class="footnote-ref" href="#fn:permnull">2</a></sup>). That orthogonality is what <em>proves</em> the two are distinct, separable axes, not one entangled thing — and it's precisely why the original vector's effects decompose so cleanly: its urgency component restored the race attention, its verdict component moved the ownership read. "Orthogonal axes" and "the vector we used mixed them" are the same fact seen twice: the axes don't overlap; the vector had a foot on each.</p>
+<p><img alt="Causal steering" src="https://doinfinitely.github.io/legible-networks/images/post4/fig2_steering.png" />
+<em>Figure — injecting the urgency direction (dose α) restores race attention on the blind boards; a permuted-channel control of identical magnitude does nothing.</em></p>
+<h2>4. The rule, exactly: extracting the automaton</h2>
+<p>Here's the part we're most methodologically excited about. To state <em>what the network computes</em> about the race with no correlational vocabulary at all, extract it as a formal object.</p>
+<p>Define an operation alphabet over the race board — <code>f</code> (white fills an inner-group liberty), <code>g</code> (black fills a ring liberty) — so every string of operations builds a legal position deterministically, and define the language L = {strings whose resulting position the network reads as ring-alive}. A neural network answering yes/no questions <em>is</em> a <strong>membership oracle</strong>, which means <a href="https://www.sciencedirect.com/science/article/pii/0890540187900526">Angluin's L* algorithm</a> (1987) — the classic active-learning algorithm that provably recovers a minimal <a href="https://en.wikipedia.org/wiki/Deterministic_finite_automaton">DFA</a> (deterministic finite automaton: finitely many states, one transition per symbol, some states accepting) from membership and equivalence queries — can be run <em>against the network</em>.</p>
+<p>Result: <strong>the network's race rule is a 19-state minimal DFA, held-out agreement 1.0000 on 2,000 random strings.</strong> And because the operations saturate, only <strong>28 distinct positions</strong> underlie the infinite language — the entire extraction cost 28 forward passes. The automaton is human-readable: a liberty-counting chain whose death boundary shifts by one for each inner liberty filled, with an absorbing ALIVE state once the inner group reaches atari — and its accept boundary sits at ring ≈ 3–4 liberties. <strong>The urgency horizon of §2, rediscovered by an independent method as the boundary of a formal machine.</strong></p>
+<!--WIDGET:lstar_extraction-->
+<blockquote>
+<p>🕹️ <strong>Interactive Figure 8 — <a href="https://doinfinitely.github.io/legible-networks/widgets/lstar_extraction.html">Extract an automaton yourself</a>.</strong> L* run live against a black-box oracle implementing a simplified rule of the same shape as KataGo's (counting rows plus an absorbing ALIVE state). Step through hypotheses: watch the observation table grow, counterexamples break each too-small guess, and the final machine assemble — then see the states laid out by the position each one corresponds to, revealing the counting-lattice structure the learner found without ever being told it. The readout tracks membership queries and <em>distinct positions probed</em>: the real extraction touched 28.</p>
+</blockquote>
+<p>Two comparisons calibrate the result: 500-visit search's verdict grid is two boundary cells more pessimistic than the raw network's, and naive race arithmetic differs by one cell — all three grids share the structure; the raw net is the most optimistic. And a methods note we insist on keeping: two earlier board families produced <em>correct automata of badly-posed languages</em> (one family was genuinely always-alive — our error in Go theory; one was confounded by global score). An extracted automaton formalizes the oracle you actually built. Family design is where this method's rigor lives.</p>
+<p><img alt="Verdict grids" src="https://doinfinitely.github.io/legible-networks/images/post4/fig3_grids.png" />
+<em>Figure — verdict grids over the 28-cell family: the extracted 19-state rule, 500-visit search, and naive race arithmetic. Red outlines mark disagreements with the raw net; all three share the structure, the raw net most optimistic.</em></p>
+<h2>5. The comparator is a passenger</h2>
+<p>Where does the rule live inside? The 28 forward passes already contain every channel's response to the entire family, so per-channel extraction is <em>free</em>. The census over 1,408 pooled stream features: <strong>42 robust liberty-counter channels for the inner group and 14 for the ring</strong>, present from block 0 — and exactly one channel, <code>tip.107</code> in the trunk's final layer, whose minimal automaton is <strong>state-for-state identical to the behavioral 19-state rule</strong>. (Notably, no channel anywhere computes the <em>correct</em> race arithmetic — the network's boundary optimism is manufactured, not misread.)</p>
+<p>Found the neuron, right? No. The causal test: clamping <code>tip.107</code> alone to its dead-class pattern flips <strong>0 of 21</strong> alive cells. Clamping the full tip state flips 21/21 with zero off-target. The state-identical comparator channel is a <strong>passenger</strong>.</p>
+<p>What carries the verdict instead is geometry: channel-subset clamps show a sharp sufficiency transition around ~32 of 128 channels over a strikingly flat per-channel effect spectrum, and a single <em>additive</em> direction — the alive/dead class-mean difference — gives <strong>complete, graded, bidirectional control</strong> (full transport at α = 1.0; only the borderline cells flip at α = 0.5; zero off-target). One rank-1 axis, smeared across essentially the whole layer; any single channel is ~1% of it. The operating rule this licenses, which the rest of the series obeys: <strong>read through channels, intervene through directions.</strong></p>
+<p><img alt="Verdict geometry" src="https://doinfinitely.github.io/legible-networks/images/post4/fig4_geometry.png" />
+<em>Figure — the verdict code's geometry: sufficiency transition at ~32 of 128 clamped channels (A); one additive direction gives total, graded control (B).</em></p>
+<p>Run the whole pipeline on <em>directions</em> instead of coordinates and the layer's apparent zoo collapses: 502 robust "mixed" channel-predicates turn out to be projections of <strong>~4 axes</strong> (two counters, the verdict, one tension-like axis), with the rule linearly cuttable from block 1 and its margin amplified ~4× on the way to the tip. <strong>Automata belong to directions; channels are shadows.</strong></p>
+<h2>6. Calibration defects vs representational defects</h2>
+<p>The verdict axis provides a diagnostic intervention. A constant one-scalar bias along it, calibrated on the race family, <strong>repairs the network's race rule exactly</strong>: at α ∈ [0.3, 0.5] the two overconfident boundary cells flip — in margin order — and the raw network's grid comes to match 500-visit search's, with zero collateral damage.</p>
+<p>The same bias, transferred to the cyclic status boards: <strong>fails</strong> (dead-group accuracy 2/20 → 3/20, with costs on the alive side). The margins explain the split: the race family's errors were <em>marginal</em> (near-threshold ownership), the cyclic misreads are <em>saturated</em> (+0.95 to +0.99). A bias small enough to preserve correct verdicts cannot cross a saturated margin; one large enough destroys everything. The taxonomy this yields, which we believe generalizes:</p>
+<ul>
+<li><strong>Calibration defects</strong> — marginal, axis-level, fixable by a one-parameter nudge to an existing representation.</li>
+<li><strong>Representational defects</strong> — saturated, computed upstream, immune to any output-side intervention, because the information being nudged isn't there.</li>
+</ul>
+<p>The cyclic blindness is the second kind. Which forces the question: is the missing thing <em>really</em> missing, or just hidden from our probes?</p>
+<p><img alt="Repair taxonomy" src="https://doinfinitely.github.io/legible-networks/images/post4/fig6_repair.png" />
+<em>Figure — the repair taxonomy: an exact-repair window on the race family (A); the same repair transferred to the cyclic boards fails (B) — the defect is upstream.</em></p>
+<h2>7. The certified absence</h2>
+<p>The candidate pipeline for judging settled life is: count liberties → detect eyes → <em>integrate</em> ("this group has two eyes") → write the verdict. Testing each stage on the status boards, with leave-one-out decoding<sup id="fnref:loo"><a class="footnote-ref" href="#fn:loo">3</a></sup>:</p>
+<ol>
+<li><strong>The verdict axis is starved, not broken.</strong> On the race family it separates classes at ±15.7 units. Every settled group — alive or dead, any size — projects on the <em>alive</em> side. Nothing upstream ever writes "dead."</li>
+<li><strong>Liberty counting generalizes</strong> out-of-family (the counter channels track true liberty counts at median |ρ| = 0.65).</li>
+<li><strong>Eye <em>presence</em> is represented</strong> — as a direction it decodes at <strong>26/26</strong> leave-one-out — though the per-channel representation thins with group size (100 → 39 → 12 strongly-separating channels as groups grow: exactly the wrong direction for the exploit's large rings).</li>
+<li><strong>The integrated life/death truth is represented nowhere.</strong> Here's the test, concretely. For each of the 26 settled groups, take as features the trunk's activations pooled over that group's region, and as target the ground truth: <em>is this group actually alive or actually dead?</em> Fit a linear decoder on 25 of the groups, predict the held-out 26th, rotate through all 26, and score the held-out predictions<sup id="fnref2:loo"><a class="footnote-ref" href="#fn:loo">3</a></sup> — this asks: is there <strong>any</strong> linear readout of the trunk's state, channel or direction, that can tell genuinely-alive settled groups from genuinely-dead ones? No channel manages it — and, decisively (because §5 taught us concepts can be channel-invisible and direction-total), the <em>distributed</em> test fails too: <strong>0.50 accuracy, below the 0.62 majority baseline</strong><sup id="fnref:baseline"><a class="footnote-ref" href="#fn:baseline">4</a></sup> — worse than a decoder that ignores the input entirely. Meanwhile the identical procedure, on the identical features and sample, targeting "does this group contain an eye" scores <strong>26/26</strong>. That control is what licenses the absence claim: the method demonstrably has power; the information is demonstrably not there.</li>
+</ol>
+<p>The root cause, named: <strong>the network never learned group-level eye integration.</strong> It counts liberties; it detects eyes; nothing anywhere composes them into "two eyes ⟹ alive." The race rule it <em>does</em> have needs no such composition — it's a comparison of two counts — which is why races engage a working (if optimistic) machine while settled groups engage nothing, and why the ownership prior defaults big groups to "alive."</p>
+<p><img alt="Certified absence" src="https://doinfinitely.github.io/legible-networks/images/post4/fig5_absence.png" />
+<em>Figure — certified absence: leave-one-out decoding of settled life/death truth at or below chance at every scale while the eye-presence control decodes near-perfectly (A); the per-channel eye representation thinning with group size (B).</em></p>
+<p>The earlier findings become corollaries: the misreads look in-distribution because every <em>local</em> feature is individually familiar, and the repair fails because a constant bias cannot substitute for a computation that never ran.</p>
+<p>Why was it never learned? Self-play never forced it: cyclic groups of the exploit's size essentially don't arise between competent players, so there was no gradient pressure to integrate eye-counting at that scale — a naturally-occurring capability hole created by training-distribution poverty. Post 6 will sharpen this into a general frame (gain schedules), and will also show the value head shares the blindness — the blind spot is <em>defended in depth</em>, which is exactly why it was exploitable.</p>
+<h2>8. Scale doesn't buy it</h2>
+<p>The complete ladder — race grid, status misreads, truth-LOO with the eye control — rerun unchanged across the family:</p>
+<table>
+<thead>
+<tr>
+<th>net</th>
+<th>race rule</th>
+<th>horizon (ring libs)</th>
+<th>dead misread</th>
+<th>LOO truth (chance .62)</th>
+<th>LOO eye control</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>b6c96</td>
+<td>19 states</td>
+<td>2</td>
+<td>9/10</td>
+<td>0.54</td>
+<td>0.92</td>
+</tr>
+<tr>
+<td>b10c128</td>
+<td>19 states</td>
+<td>3</td>
+<td>10/10</td>
+<td>0.50</td>
+<td>1.00</td>
+</tr>
+<tr>
+<td>b20c256x2</td>
+<td><strong>22 states</strong></td>
+<td>1</td>
+<td>7/10</td>
+<td>0.50</td>
+<td>1.00</td>
+</tr>
+</tbody>
+</table>
+<p>The missing circuit is a <strong>family property</strong> across ~30× parameters. The largest net misreads slightly fewer dead groups but is worse on living ones, its internal truth signal is equally absent, and its extracted race rule is <em>more complex and more optimistic</em> (22 states, death boundary at a single remaining liberty) — a concrete counterexample to the assumption that scale monotonically repairs calibration.</p>
+<h2>9. Why LW readers should care</h2>
+<p>Four transferable lessons:</p>
+<ol>
+<li><strong>Adversarial-robustness intuitions from image classifiers can mislead.</strong> No brittle decision boundary is being crossed by a perturbation here. An <em>absent computation</em> is being routed around by an adversary who (behaviorally) found the hole. Patching, smoothing, and certified-radius thinking do nothing against holes — and behavioral evaluation can't find them, because on the training distribution the hole is never load-bearing.</li>
+<li><strong>"We found the neuron for X" needs a causal test, and the strongest possible localization evidence can still fail it.</strong> A channel whose extracted automaton is state-identical to the behavioral rule was a passenger.</li>
+<li><strong>Absence claims are certifiable, but only with a matched positive control.</strong> "The model doesn't represent X" is the hardest kind of interpretability claim, because every null result has two explanations: the information is absent, or your probe is too weak to find it. A decoder scoring 0.50 on life/death truth, by itself, distinguishes between those not at all. The only way to break the ambiguity is the wet-lab move: run the <em>identical</em> probe — same features, same pooled regions, same 26-example sample, same decoder class — against a target you independently know is present and is comparable in kind (eye <em>presence</em>: same regions, same granularity, one compositional step simpler). When the control saturates (26/26) while the target sits below the ignore-the-input baseline, "probe too weak" is eliminated, and the null converts into a certification — <em>relative to the probe class</em>, here all linear readouts, which is why we state it that way. Without the matched control, an absence claim is an anecdote about your probe. (This discipline pays off again in post 6 — where it's turned on our own claims, and convicts two of them.)</li>
+<li><strong>The discovery gap is principled.</strong> Would unsupervised methods have found the four load-bearing axes? <a href="https://en.wikipedia.org/wiki/Principal_component_analysis">PCA</a> finds the verdict axis as PC1 — <em>when the input family is designed to make it dominate variance</em> (57–85%). But the language-model depth counter of post 5's testbed carries <strong>0.1% of variance</strong> despite R² 0.993 decodability: no principal component has cosine &gt; 0.07 with it, and no <a href="https://transformer-circuits.pub/2023/monosemantic-features">sparse-autoencoder</a> atom correlates above 0.305. <strong>PCA and SAEs are variance-loyal, and variance is not meaning.</strong> If your interpretability pipeline is variance-loyal, expect it to systematically miss the small, decision-critical directions that safety cases turn on. Working modes that did find them: probes, designed input families, and residual analysis.</li>
+</ol>
+<p><img alt="The discovery gap" src="https://doinfinitely.github.io/legible-networks/images/post4/ap4_gap.png" /></p>
+<p>Next: the same structure-vs-behavior split, in a language model — a pristine, causally-writable stack in the residual stream that the model's own behavior almost completely ignores, and the 100k-token finetune that wires it in. <a href="https://doinfinitely.github.io/legible-networks/05-the-stack-the-model-never-read.html">Post 5: The Stack the Model Never Read</a>.</p>
+<hr />
+<div class="footnote">
+<hr />
+<ol>
+<li id="fn:families">
+<p>Global balance matters more than it sounds: an early custom family taught us that on lopsided boards, value and ownership reflect the <em>game outcome</em> rather than the local fight, silently invalidating any local readout. Both families used here come from Wang et al.'s own <code>go_attack</code> diagnostic suite.&#160;<a class="footnote-backref" href="#fnref:families" title="Jump back to footnote 1 in the text">&#8617;</a></p>
+</li>
+<li id="fn:permnull">
+<p>Permutation null: the distribution of the statistic (here |cosine|) under random channel permutations of one vector — the "how big would this look by chance" yardstick. |cos| = 0.05 against a null of ≈ 0.066 is indistinguishable from unrelated.&#160;<a class="footnote-backref" href="#fnref:permnull" title="Jump back to footnote 2 in the text">&#8617;</a></p>
+</li>
+<li id="fn:loo">
+<p>Leave-one-out decoding: fit a linear decoder on all examples but one, predict the held-out one, rotate through the set; the accuracy over held-out predictions. With 26 examples this is the honest small-sample estimate — every prediction is on data the decoder never saw.&#160;<a class="footnote-backref" href="#fnref:loo" title="Jump back to footnote 3 in the text">&#8617;</a><a class="footnote-backref" href="#fnref2:loo" title="Jump back to footnote 3 in the text">&#8617;</a></p>
+</li>
+<li id="fn:baseline">
+<p>The majority baseline is 0.62 because the class split is uneven — always guessing the more common class gets you 62%. A decoder scoring <em>below</em> that is finding structure worse than "ignore the input," i.e., nothing.&#160;<a class="footnote-backref" href="#fnref:baseline" title="Jump back to footnote 4 in the text">&#8617;</a></p>
+</li>
+</ol>
+</div>

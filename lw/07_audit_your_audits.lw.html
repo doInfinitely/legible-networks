@@ -1,0 +1,128 @@
+<p><em>Post 7 of the <strong>Legible Networks</strong> series. Sources: the writeups</em> The Baseline Law <em>and</em> The Grounding Law <em>in the <code>explainable_ai</code> repo, plus their follow-up instruments (strength ladder, near-tie analysis, castling forensics). Two self-contained methodological results for anyone measuring "drives" in trained agents — and, between them, the cleanest run of the kill-your-own-findings pattern in the whole project. Interactive figures continue the series numbering.</em></p>
+<p><em>The whole series is also readable as a <a href="https://doinfinitely.github.io/legible-networks/">self-contained site</a> with the interactive figures embedded inline.</em></p>
+<p><strong>Epistemic status:</strong> each law replicates across two game domains (chess and Go — different networks, training pipelines, and search implementations), with a language model as the contrast case; the LM leg of the grounding law now replicates across a 14× scale range (0.5B–7B). Both laws are stated as measurable diagnostics rather than universal claims, and the limitations sections of both source papers are candid about what three domains can and cannot establish.</p>
+<hr />
+<h2>The puzzle</h2>
+<p>Two questions anyone auditing a trained agent eventually asks:</p>
+<ol>
+<li><strong>What does this policy systematically steer toward?</strong> — its "drives," in the revealed-preference sense borrowed from economics: don't ask it, watch it.</li>
+<li><strong>Does inference-time search amplify those tendencies, or correct them?</strong> — the mesa-optimization-adjacent worry about search-augmented systems.</li>
+</ol>
+<p>One shared instrument answers both, and each answer comes with a trap that swallowed our own first reports.</p>
+<h2>1. The instrument</h2>
+<p>All the audits share one design. Take ~200 roots (real game positions from strong human play; real text prompts). From each root, roll a fixed horizon (12–16 plies; 128–384 tokens) under (a) the raw policy, (b) the search-augmented policy, and — in the games — (c) a random-legal baseline. At every step, record the network's internal features (pooled channel or stream activations) plus hand predicates (material, mobility, liberties, entropy…). Per-feature slopes over the trajectory, in pooled-standard-deviation units, give each condition a <strong>drift profile</strong>: what this way of acting does to the network's internal state over time.</p>
+<p>Two contrasts carry everything. <strong>Preference</strong> = policy − baseline: what the policy steers toward relative to undirected play. <strong>Mesa</strong> = search − policy <em>on the same roots</em>: the behavioral delta purchased by inference-time computation. Note the mesa contrast never touches the baseline — which will matter, because the baseline is where the first trap lives.</p>
+<p>And to be precise about the counts quoted throughout: a "feature" is one tracked scalar — one pooled channel in the game networks (2,688 in Leela's trunk), one unit-level activation in the LM (22,400 of them in the folded 0.5B: every hidden unit at every layer) — and a feature <em>counts</em> toward a contrast when its paired slope difference between the two conditions, across the ~200 shared roots, survives a multiple-comparisons correction (Bonferroni across all features). So "1,079 significant channels" means: 1,079 of 2,688 tracked scalars drift differently under the policy than under random play, at a threshold strict enough that the expected number of false positives across the whole sweep is below one.</p>
+<h2>2. The trap, and the three rebasings</h2>
+<p>The naive audit seems innocent: features whose drift differs significantly between policy and <em>random-action</em> baseline are "redirected"; the redirected set, signed and ranked, is the policy's drive profile. Run that way, all three systems have vivid personalities — <strong>1,079</strong> significantly redirected features in chess, <strong>804</strong> in Go, <strong>~8,300</strong> in the LM, with quotable signatures (simplification drives, stone-capture drives, likelihood-seeking drives). Our own Day-5 chess report published exactly this.</p>
+<p>But "what does this policy do that random action does not?" has an expansive true answer: <em>everything competent.</em> Random chess bleeds material; random Go fills its own eyes and dies; random text is not text. So swap in a <strong>competent</strong> baseline — the continuations strong humans actually played from those same roots (lichess masters; KGS high-dan games), or the prompt's real source text — and re-run the identical audit:</p>
+<table>
+<thead>
+<tr>
+<th>contrast (chess)</th>
+<th>significant channels</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>policy − random</td>
+<td>1,079</td>
+</tr>
+<tr>
+<td><strong>human − random</strong></td>
+<td><strong>1,112 — humans "redirect" <em>more</em> features than the policy</strong></td>
+</tr>
+<tr>
+<td>policy − human</td>
+<td><strong>23</strong></td>
+</tr>
+</tbody>
+</table>
+<p>The competent baseline redirects the same features, in the same directions, at nearly the same strength: profile correlations <strong>+0.988</strong> (chess), <strong>+0.982</strong> (Go, where 804 collapses to 16), +0.844 (LM), magnitude ratios 1.01 / 0.90 / 0.88. The policy's celebrated "simplification drive" (trading pieces at −0.535/step) is matched by humans at −0.538 — <em>it is what strong chess is</em>. Calling it a drive of the model is auditing a grandmaster against a coin-flipper and diagnosing an idiosyncratic aversion to hanging her queen.</p>
+<p><img alt="The deflation" src="https://doinfinitely.github.io/legible-networks/images/post7/bl1_deflation.png" /></p>
+<blockquote>
+<p><strong>The Baseline Law: random baselines measure competence; competent baselines measure character.</strong> Quantitatively: the naive audit overstates the drive inventory ~50× in feature count and ~5× in magnitude, and its profile is +0.98 correlated with what any strong player produces — a competence detector wearing a personality-test costume.</p>
+</blockquote>
+<p>The law has a constructive reading: the <em>difference of baselines</em> is itself the measurement. (policy − random) estimates the domain's competence signature — valuable, but not a property of this policy. (policy − competent) estimates the policy's character — small, specific, and the thing safety questions are actually about. And a follow-up sharpens the deflation further: using a temperature dial on the policy itself as a continuous competence ladder, the naive profile is already <strong>+0.958 correlated with full strength at −548 Elo</strong>, saturating hundreds of Elo below the actual policy. The random-baseline audit can't even distinguish a −178-Elo player from the full policy — it measures not just competence but <em>crude</em> competence.<sup id="fnref:ladder"><a class="footnote-ref" href="#fn:ladder">1</a></sup></p>
+<p><img alt="Profiles are the same vector" src="https://doinfinitely.github.io/legible-networks/images/post7/bl2_scatter.png" /></p>
+<h2>3. What the residual actually is: a kill-test chain</h2>
+<p>So what survives rebasing — what is the chess policy's actual character? Our first answer was <strong>mobility</strong> — the count of legal moves available to a side, chess's standard measure of piece freedom and activity ("keep your options open," as a number). The story: humans preserve mobility over a continuation, the policy lets it collapse — and we celebrated the agreement with the mesa analysis. Here is what happened to that claim, in order, because the chain is the methodological content:</p>
+<ol>
+<li><strong>Proposed</strong> at n = 192: humans +0.038/step, policy −0.036.</li>
+<li><strong>Replicated at 3.2× the sample</strong> (621 paired roots, both conditions deterministic given roots): gap +0.059 ± 0.140, <strong>p = 0.41, point estimate sign-flipped</strong>. The original slopes were root-sample fluctuations. Retracted.</li>
+<li><strong>The 23-channel residual count stands</strong> (Bonferroni-corrected<sup id="fnref:bonf"><a class="footnote-ref" href="#fn:bonf">2</a></sup>) — so what do those channels encode? At n = 617 the robust set grows to 93 channels, concentrated at the input conv, substantially one factor — and a predicate battery is unanimous: every top channel tracks <strong>castling rights</strong> (r = 0.53–0.96).</li>
+<li><strong>Direct event count</strong>: from these middlegame roots, humans castle within 12 plies in <strong>22.0%</strong> of continuations. The greedy policy castles in <strong>0.0%</strong> — zero castling moves across 627 games (paired t = −13.3). The policy's one established character trait is that <em>it does not castle where humans do</em> — an absolute behavioral difference that had been hiding under a misattributed drift statistic.</li>
+</ol>
+<p>Then the forensics, which are the best part. At the 138 positions where humans actually castled, the policy's median <em>prior</em> on the castling move is <strong>0.0092</strong> — yet its own <em>value head</em> ranks the castle <strong>#1 in 43% of cases and top-3 in 80%</strong>. The policy's single character trait lives entirely in the prior; the value head dissents from it. And search arbitrates in proportion to budget: MCTS castling rates run 0.002 → 0.011 → 0.049 → 0.110 → 0.169 → 0.176 across 25–800 simulations — because at 800 simulations a 1%-prior child receives ~8 visits, too few to overturn a half-point margin. <strong>Pure prior starvation, budget-curable</strong> — the same starve-the-search wiring as KataGo's urgency horizon (post 4), but <em>shallow</em>: here the value head sees clearly, so cheap search recovers what the prior suffocates.</p>
+<!--WIDGET:castle_curve-->
+<blockquote>
+<p>🕹️ <strong>Interactive Figure 12 — <a href="https://doinfinitely.github.io/legible-networks/widgets/castle_curve.html">Prior starvation, budget-curable</a>.</strong> The measured castling recovery curve: drag the simulation budget from 25 to 800 and watch search claw the castling rate from the policy's flat 0.0% toward the humans' 22.0%, with the visit arithmetic displayed at each budget (a 0.9% prior × N simulations = the visits available to discover the branch the value head already endorses). This one curve is the baseline law's residual, the grounding law's mechanism, and post 4's starvation wiring on a single plot — with the crucial difference annotated: here the value head dissents from the prior, so the defect is budget-curable rather than defended in depth.</p>
+</blockquote>
+<p><strong>Go's residual inverts the structure</strong>, completing a taxonomy. The rebased Go residual is <strong>locality</strong>: the policy answers within distance 3 of the previous move 62.9% of the time; the humans 53.8% (~11σ) — the raw policy under-<em>tenukis</em> (tenuki: Go's term for breaking away to play elsewhere). But run the same two-head forensics and everything flips: at the 448 positions where humans tenuki'd, the policy's prior on the human move is a healthy 0.127, and its value head rates the human tenuki <em>worse</em> (−2.3% winrate). Where castling was an internal disagreement (starved prior, dissenting value → decoding artifact, budget-curable), locality is a <strong>coherent judgment</strong> — both heads prefer the local answer, jointly and knowingly. Which raises the final twist the paper doesn't flinch from. A residual is a <em>two-sided</em> difference — policy vs baseline — and a deviation from best play belongs to whichever side is <em>weaker</em>. In chess the baseline (masters) outrates the raw policy's castling behavior, so the residual is the <strong>policy's</strong> defect. But the b10 Go network likely outrates KGS high-dan amateurs — so the locality residual may be the <strong>baseline's</strong> trait, not the network's: the humans' tenukis may simply be premature, and what the audit measured is <em>their</em> impatience, judged against a stronger player's discipline. Hence: <strong>competent baselines measure character — and it is the weaker party's character they measure.</strong> Residual traits now classify by (prior stance, value stance): starved + dissenting = decoding artifact, chargeable to the policy; healthy + concurring = genuine judgment difference, chargeable to whichever side the strength ordering says is wrong.<sup id="fnref:twohead"><a class="footnote-ref" href="#fn:twohead">3</a></sup></p>
+<h2>4. The grounding law</h2>
+<p>Now the second question: with honest drive profiles in hand, does search amplify a policy's tendencies or lean against them? The summary statistic is <strong>corr(preference, mesa)</strong> — negative means search systematically pushes where the policy's habits pull; zero means search is behaviorally inert with respect to them. It's measurable without knowing the system's objective: rollouts under policy and under search, plus activations, suffice.</p>
+<table>
+<thead>
+<tr>
+<th>domain</th>
+<th>search</th>
+<th>value signal backing the search</th>
+<th>corr(pref, mesa)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>chess (Leela T70)</td>
+<td>PUCT MCTS-200, +608 Elo</td>
+<td>game outcome — <strong>external</strong></td>
+<td><strong>−0.27</strong></td>
+</tr>
+<tr>
+<td>Go (KataGo b10)</td>
+<td>engine search</td>
+<td>game outcome — <strong>external</strong></td>
+<td><strong>−0.21</strong></td>
+</tr>
+<tr>
+<td>language (Qwen 0.5B)</td>
+<td>beam-8 vs greedy</td>
+<td>the model's own likelihood — <strong>internal</strong></td>
+<td><strong>−0.006</strong> (→ −0.090 at 384 tokens)</td>
+</tr>
+</tbody>
+</table>
+<p>In both games the mesa profile is ~10× smaller than the preference profile and lives on the same channels, with the negative sign saying: where the policy pushes, search pulls back toward what <em>wins</em>. In chess the legible exemplar is the castling curve above — search spending its budget recovering exactly the behavior the prior starves.<sup id="fnref:mobmesa"><a class="footnote-ref" href="#fn:mobmesa">4</a></sup></p>
+<p>The LM row needs unpacking, because two different hypotheses die in it. Going in, we had pre-registered <em>amplification</em>: beam search optimizes the model's own likelihood, so it should act as a mode-seeker, concentrating trajectories deeper into the model's habits than greedy decoding does. The obvious boring alternative — that beam search barely changes the output, so of course nothing differs — is ruled out first: beam rewrites <strong>65% of tokens</strong>, with continuations typically diverging from greedy by token ~6. Behaviorally, these are substantially different texts.</p>
+<p>And yet, in drive-feature space, they are the same trajectory. At 128 tokens, only 4 of the 22,400 tracked unit activations show a beam-vs-greedy slope difference that survives the correction (against thousands that separate either condition from the random baseline — the instrument has plenty of power; there is simply no search−policy signal for it to find). At 384 tokens the model's drives have <em>intensified</em> — 9,819 of the 22,400 units now drift significantly differently under the policy than under real text — and greedy decoding is deep in degeneration, looping in 75% of continuations. The mesa count at the same horizon: <strong>0 of 22,400</strong> — not one unit's trajectory distinguishes beam from greedy — with beam looping at a statistically indistinguishable 0.708. So beam search neither amplified the model's tendencies (the pre-registered bet) nor moderated them (the games' pattern): it produced different words along the <em>same</em> internal trajectory. Ungrounded search doesn't participate in drive dynamics at all — there is one attractor landscape, set by the policy, and beam walks it with more lookahead into the same basins. The null is also scale-invariant: rerun on the folded 1.5B, 3B, and 7B, mesa features number <strong>0, 0, and 1</strong> — of roughly a hundred thousand unit-level features in the 7B, exactly one moves when beam search is added — while the drive inventories balloon with scale as usual. Bigger models: more drives, same non-participating search.</p>
+<p><img alt="Search inert in the LM" src="https://doinfinitely.github.io/legible-networks/images/post7/gl2_inert.png" /></p>
+<blockquote>
+<p><strong>The Grounding Law: search moderates a policy's drives if and only if its value signal is anchored outside the policy.</strong> Game search backs up terminal outcomes — information the policy did not generate — and that outside information is what pushes back against habit. Beam search backs up the policy's own scores; it cannot correct what generates it. The mechanism is almost tautological once seen, which is its virtue: it depends on nothing but the provenance of the value signal.</p>
+</blockquote>
+<p><img alt="The grounding law" src="https://doinfinitely.github.io/legible-networks/images/post7/gl1_grounding.png" /></p>
+<p>Honest limits, from the paper: the "iff" is an extrapolation from two grounded points and one ungrounded; regression to the mean contributes an unknown (split-half-bounded, not eliminated) share of the negative correlations; and grounding can fail <em>locally</em> even when the training signal was external — the cyclic positions of posts 4 and 6, where an outcome-trained value head is confidently wrong and search dutifully amplifies the error, are exactly that failure mode. Grounded-in-training is necessary, not sufficient; the value signal must also be right <em>here</em>.</p>
+<h2>5. Why we think this pair matters</h2>
+<p><strong>Deflation is the prior.</strong> As interpretability tooling makes it cheap to enumerate thousands of "significantly redirected features," expect drive inventories to be dominated by competence signatures unless the baseline is competent. This is the agent-auditing version of population stratification in GWAS<sup id="fnref:gwas"><a class="footnote-ref" href="#fn:gwas">5</a></sup>: the confound produces abundant, real, replicable signal that means something other than what it's cited for. The correction costs under a day wherever expert trajectories exist.</p>
+<p><strong>The kill-test pattern, commended as a norm.</strong> This post's material contains four of our own headline findings killed or demoted by controls we built afterward: beam amplification (killed by the long-horizon run), self-generation drift as the bulk story (killed by the real-continuation control), the mobility residual (killed by its own 3.2× replication), and drives-as-preferences wholesale (killed by human baselines). The durable results are the ones that survived their kill-tests — the castling forensics, the grounding sign, the two-head taxonomy. Every audit conclusion should be paired, before publication, with the cheapest experiment that could destroy it; in our experience that experiment usually exists and costs an afternoon.</p>
+<p><strong>The diagnostic travels.</strong> A robustly negative corr(pref, mesa) is behavioral evidence — obtainable from outside, with no access to objectives or training history — that a system's search consumes information its policy doesn't already contain. That is the property you'd want established before trusting search-amplified oversight (debate, best-of-n against a learned reward model, any scheme where the grader shares the generator's inductive biases). The LM column is the cautionary tale: self-scored search didn't make the model worse — it provably, at four scales, added <em>nothing</em> the policy didn't already contain. And posts 4 and 6 showed the sharp end of the same variable: when the "external" value signal shares the blind spot, search doesn't just fail to correct — it defends the error in depth.</p>
+<p>One post left: what the exact attribution instrument reported when we ran it to the end of its logical rope — identically zero, past five layers — and the surprisingly constructive picture of deep computation that came out of the wreckage. <a href="https://doinfinitely.github.io/legible-networks/08-the-drifting-frame.html">Post 8: The Drifting Frame and the Program Atlas</a>.</p>
+<hr />
+<div class="footnote">
+<hr />
+<ol>
+<li id="fn:ladder">
+<p>A companion "knowledge ladder" strengthens this further: weaken the policy by <em>deleting specific computation</em> (post 8's deviation-channel interventions, Elo-priced) instead of by temperature noise, and the profile similarity tracks <em>Elo, not weakness type</em> — matched-Elo rungs of entirely different mechanism are nearly identical profile-to-profile (0.976–0.992). The competence signature measures competence robustly to how competence is lost, so rebasing works with any Elo-matched competent reference.&#160;<a class="footnote-backref" href="#fnref:ladder" title="Jump back to footnote 1 in the text">&#8617;</a></p>
+</li>
+<li id="fn:bonf">
+<p>Bonferroni correction: when testing thousands of features at once, divide the significance threshold by the number of tests so the <em>expected count</em> of false positives stays below one — the conservative standard for "how many features are really moving."&#160;<a class="footnote-backref" href="#fnref:bonf" title="Jump back to footnote 2 in the text">&#8617;</a></p>
+</li>
+<li id="fn:twohead">
+<p>The taxonomy's fourth cell comes from the value head's own fossil (post 8's KPvK study): static win-confidence leaks ~1% per ply of unresolved <em>calculation demand</em> beyond ~8 plies while the policy holds the win at ≥96% — value-leaky, policy-healthy, the mirror image of castling. Each head fossilizes in its own mode (the prior from visit-distribution feedback on near-ties, the value from outcome sparsity at long horizons), in both cases the <em>other</em> head knows better, and cheap search arbitrates. A related instrument fix worth stealing: any statistic comparing the argmax move against the legal-move <em>average</em> measures competence (the top move beats the average move on every sensible metric); the clean version restricts to <strong>near-ties</strong> — positions where the top two priors are within 20% — where tie-breaks are pure character. Run that way, mobility is null (retraction confirmed from a new angle), castling never once reaches a near-tie (starvation re-derived), and one small trait survives a 7-test correction: when torn between value-equivalent moves, the prior picks the more <em>forward</em> one (+0.12 squares, p = 0.005), priced at ≲35 Elo — a real, cheap, fossilized bias rather than load-bearing knowledge.&#160;<a class="footnote-backref" href="#fnref:twohead" title="Jump back to footnote 3 in the text">&#8617;</a></p>
+</li>
+<li id="fn:mobmesa">
+<p>A bookkeeping note for readers of both source papers: the grounding paper (drafted three days earlier) describes the chess mesa correction's largest component as mobility preservation and links it to the then-current mobility residual. The mesa contrast itself is baseline-free and survives — search genuinely preserves mobility better than the raw policy does (−0.066 vs −0.232/step) — but the <em>link</em> to "the policy's one idiosyncrasy vs humans" died with the mobility retraction above. The castling curve is the exemplar that survives both papers.&#160;<a class="footnote-backref" href="#fnref:mobmesa" title="Jump back to footnote 4 in the text">&#8617;</a></p>
+</li>
+<li id="fn:gwas">
+<p>In genome-wide association studies, uncorrected ancestry differences between cases and controls generate thousands of replicable, statistically real associations that reflect population structure rather than disease biology — the canonical example of a confound that produces <em>abundant true signal about the wrong thing</em>.&#160;<a class="footnote-backref" href="#fnref:gwas" title="Jump back to footnote 5 in the text">&#8617;</a></p>
+</li>
+</ol>
+</div>

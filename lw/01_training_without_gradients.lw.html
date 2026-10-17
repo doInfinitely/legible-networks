@@ -1,0 +1,149 @@
+<p><em>Post 1 of the <strong>Legible Networks</strong> series. Everything here is from a single day of experiments on MNIST; code, models, and logs are in the <a href="https://github.com/doInfinitely/unit-net">dual-projection-mnist repo</a><sup id="fnref:repo"><a class="footnote-ref" href="#fn:repo">1</a></sup>. The work throughout this series is a human–AI collaboration (Remy driving, Claude at the keyboard); we'll flag where that matters. The interactive figures are hosted separately — links inline — with static fallbacks for readers who prefer them.</em></p>
+<p><em>The whole series is also readable as a <a href="https://doinfinitely.github.io/legible-networks/">self-contained site</a> with the interactive figures embedded inline.</em></p>
+<p><strong>Epistemic status:</strong> empirical, single dataset, small networks (≈100k parameters), but with matched-budget comparisons, ablations, and self-checking evaluation code. The specific accuracy numbers are solid; the organizing thesis at the end is stated at the strength we currently believe it.</p>
+<hr />
+<h2>The puzzle</h2>
+<p>Here is the question we started the day with, verbatim from the session's framing:</p>
+<blockquote>
+<p>Can simulated annealing with beam search — moves of ±δ on a synapse, parallel row perturbation with renormalization, and moving δ of weight between two edges that project to the same neuron — replace backprop, and at what resource cost?</p>
+</blockquote>
+<p>Not "in principle, given infinite compute" (yes, trivially) but at operating points anyone cares about: how many accuracy points does each ingredient of gradient descent actually buy, and are there hardware regimes where blind search wins?</p>
+<p>To make the question honest you need a search space where local moves are natural and never leave the feasible set. That's what the geometry is for.</p>
+<h2>The geometry</h2>
+<p>A <strong>unit-net</strong> layer keeps two nonnegative matrices, excitatory <code>P</code> and inhibitory <code>N</code>, with pre-activation <code>z = Pa − Na</code>, under three rules:</p>
+<ol>
+<li>Every row of <code>P</code> sums to exactly 1 — each neuron gets a <em>unit budget</em> of excitation, spent as a convex combination of its inputs.</li>
+<li>Every entry of <code>N</code> lies in [0, 1].</li>
+<li>Inputs in [0, 1] ⟹ all activations in [0, 1], <em>by theorem</em>, not by clipping.<sup id="fnref:theorem"><a class="footnote-ref" href="#fn:theorem">2</a></sup></li>
+</ol>
+<!--WIDGET:unitnet_layer-->
+<blockquote>
+<p>🕹️ <strong>Interactive Figure 1 — <a href="https://doinfinitely.github.io/legible-networks/widgets/unitnet_layer.html">A dense layer and its unit-net analog</a>.</strong> Left: an ordinary dense layer, where each neuron's incoming weights live on whatever scale training happened to leave them (hover a neuron: row scales differ by ~40× within one layer, so "this weight is big" is meaningless across neurons). Right: the same connectivity as a unit-net — every neuron's excitation is a stacked budget bar summing to exactly 1.0, every inhibitory synapse bounded by 1. Hover to inspect any neuron's budget; resample to see the <em>invariant</em> hold for every draw.</p>
+</blockquote>
+<p>Why bother? Two reasons. First, the constraint set is a product of simplices and boxes — a bounded, well-shaped search space where the natural local moves (shift a bit of budget from one synapse to another; nudge one inhibitory weight) never leave the feasible set. That makes it an honest arena for gradient-free methods. Second — and this became the point of the whole research program — magnitudes get <em>fixed units</em>. A path product through the network is bounded and comparable to any other path product. "This is a strong connection" becomes an absolute statement rather than one relative to whatever scale that layer happened to learn.</p>
+<h2>What backprop had to survive</h2>
+<p>The oracle baseline is backprop through a constraint-satisfying reparameterization:</p>
+<blockquote>
+<p><code>P = row-softmax(W)</code>,  <code>N = sigmoid(V)</code></p>
+</blockquote>
+<p>where <strong><code>W</code> and <code>V</code> are ordinary, unconstrained real-valued matrices — the actual trainable parameters</strong>. Row-softmax maps each row of <code>W</code> onto the probability simplex (guaranteeing the sum-to-1 constraint), and sigmoid squashes each entry of <code>V</code> into (0, 1) (guaranteeing the bound on inhibition). Backprop never touches <code>P</code> and <code>N</code> directly; it does gradient descent on <code>W</code> and <code>V</code>, and the constraints hold by construction.</p>
+<p>Getting this to work surfaced four traps. None of them is exotic optimization lore — each is a direct, mechanical consequence of the geometry, and each cost us real debugging time:</p>
+<p><strong>1. Dead-ReLU initialization.</strong> By construction <code>Pa ≤ 1</code> — a convex combination of inputs that are each at most 1 can't exceed 1. But there's no matching cap on <em>total</em> inhibition: a neuron with 784 inputs and <code>N</code> entries initialized near 0.5 (which is exactly what an innocent <code>V ≈ 0</code> init gives you) receives inhibition on the order of <em>hundreds</em>. So <code>z = Pa − Na</code> is enormously negative for every neuron on every input, every ReLU outputs zero, the gradient is identically zero, and training never begins. The fix: initialize <code>V</code> strongly negative so <code>N</code> starts near zero, and let inhibition be <em>earned</em> during training.</p>
+<p><strong>2. The weight-decay trap.</strong> Reflexively adding weight decay to all parameters — standard hygiene — is actively destructive here, in a sneaky way. Decay pulls <code>V</code> toward 0, and <code>sigmoid(0) = 0.5</code>, so "regularization" silently <em>grows</em> every inhibitory synapse toward half strength, strangling the network it was meant to protect. The lesson generalizes well beyond unit-nets: <strong>penalties must be applied to the semantically meaningful object</strong> (here, L1 on <code>N</code> itself), never to the coordinates of a reparameterization — because the reparameterization's zero point can mean something entirely different from "small."</p>
+<p><strong>3. Vanishing logit spread.</strong> Convex rows are weighted averages, and an average of values in [0, 1] stays in [0, 1]. Stack two such layers and your ten output logits all land within a few hundredths of each other. Softmax over near-identical logits is near-uniform; cross-entropy against a near-uniform distribution produces gradients too small to be useful. The fix is a fixed multiplicative logit scale of 60–100 (an inverse temperature, effectively) so the loss has teeth. Nothing adaptive needed — but without it, training crawls regardless of optimizer.</p>
+<p><strong>4. Margin-memorization collapse.</strong> Each inhibitory synapse is bounded by 1, but a <em>row</em> of <code>N</code> can have hundreds of entries, so total inhibition per neuron is effectively unbounded. Late in training, the network discovers it can drive wrong-class logits to huge negative values on individual training examples — memorization by margin inflation. Train accuracy keeps improving while test accuracy falls off a cliff (97% → 80% within a few epochs). Validation-based model selection isn't hygiene here; it's mandatory. Notably, this is the geometry's <em>one</em> pathway to overfitting, and it's legible: you can watch the inhibition row-sums grow.</p>
+<p>Tuned, backprop reaches <strong>97.2%</strong> test at hidden width 64. An unconstrained twin, fairly tuned, reaches 97.7% — so the constraints cost gradient descent roughly half a point of ceiling, and, notably, produce the smallest train–test generalization gap of anything we ran (0.2 vs 0.5).</p>
+<h2>The annealer, and what actually mattered</h2>
+<p>The gradient-free contender: beam-search simulated annealing. Keep a beam of 8 networks; each step, spawn 31 mutants per beam member, score all 256 candidates on a shared minibatch (one batched GPU matmul), and <strong>Boltzmann-select</strong> survivors at an annealed temperature.<sup id="fnref:boltzmann"><a class="footnote-ref" href="#fn:boltzmann">3</a></sup></p>
+<p>The move vocabulary is where the interesting science happened, and it's worth walking the findings in the order they were earned:</p>
+<p><strong>Selection noise, not landscape ruggedness, caused every plateau.</strong> A 256-example scoring batch has cross-entropy noise comparable to the real differences between candidates — so selection was flipping coins between genuinely better and worse mutants. Growing the scoring batch over the run (256 → 2048) turned a hard plateau at 76% into monotone climbing. If your evolutionary method is stuck, check the noise floor of your fitness function before blaming the landscape.</p>
+<p><strong>Move design dominates schedule tuning.</strong> Ablations: two moves alone — single-inhibitory-weight nudges, plus moving δ of budget between two excitatory synapses of one neuron — matched the full move set at 1/6 the compute. Whole-row Gaussian noise, the "obvious" mutation operator, was dead weight.</p>
+<p><strong>Structured proposals beat temperature.</strong> Adding a "Gaussian blob" move — perturb a spatially <em>contiguous patch</em> of a first-layer receptive field, with the blob radius annealed from 6 pixels down to sub-pixel over the run — added <strong>+3.2 points at zero extra cost</strong>. This is convolution's inductive bias (nearby pixels belong together), injected through the <em>proposal distribution</em> instead of through weight sharing.</p>
+<!--WIDGET:blob_anneal-->
+<blockquote>
+<p>🕹️ <strong>Interactive Figure 2 — <a href="https://doinfinitely.github.io/legible-networks/widgets/blob_anneal.html">The blob move, annealing live</a>.</strong> One first-layer receptive field (784 excitatory weights, drawn as a 28×28 heatmap), optimized by nothing but blob proposals under Boltzmann acceptance. Watch the radius schedule do its work: early wide blobs rough in mass where it belongs; late sub-pixel blobs sharpen edges. The ring flashes green on accepted proposals, rust on rejections — and you can watch the rejection rate climb as the temperature falls. This is the coarse-to-fine schedule the whole session kept rediscovering.</p>
+</blockquote>
+<h3>Topology beats geometry</h3>
+<p>This deserves its own section, because it's the day's most conceptually interesting result, and it comes in three rungs.</p>
+<p><em>Rung 1 — geometry of the input.</em> The blob move above uses pixel geometry: perturb weights that are neighbors <em>on the image</em>. Worth +3.2 points, as noted. Fine — but that prior only exists at the first layer, where weights have spatial addresses.</p>
+<p><em>Rung 2 — imposed, arbitrary geometry.</em> What about hidden layers, where neurons have no spatial arrangement at all? We <em>imposed</em> one: arrange the 64 hidden units on an 8×8 lattice — an arbitrary assignment, no relationship to function — and run blob moves on that lattice. This reached <strong>90.4%</strong>, a solid gain over unstructured moves. Which is strange on its face: the lattice is fake. The resolution is that what a blob move really buys is <em>correlated multi-synapse edits</em> — moving a coherent group of parameters together, at a coherence scale you can anneal — and even a fake geometry supplies that.</p>
+<p><em>Rung 3 — derived, functional topology.</em> If any coherent grouping helps, the <em>right</em> grouping should help more — and the network can tell you what it is. Every ~1k steps: run the current network on data, record which hidden units co-activate, build the <strong>activation-correlation graph</strong>, and take its graph Laplacian <code>L</code>. Then propose "blobs" not on any spatial grid but as <strong>heat kernels on this graph</strong> — <code>exp(−tL)</code> applied to a random seed unit, i.e., a bump of perturbation that diffuses along the functional wiring, touching strongly-correlated units a lot and uncorrelated units not at all. The diffusion time <code>t</code> plays the role the radius played on the pixel grid, and anneals the same way.</p>
+<p>Result: <strong>91.4%, the session's gradient-free record.</strong> This is Hebb's principle — units that fire together — applied not to the weights but to the <em>search operator</em>: mutate together what fires together.</p>
+<!--WIDGET:functional_graph-->
+<blockquote>
+<p>🕹️ <strong>Interactive Figure 3 — <a href="https://doinfinitely.github.io/legible-networks/widgets/functional_graph.html">Lattice blobs vs functional blobs</a>.</strong> Sixty-four hidden units, colored by their true functional community (which the search algorithm never sees directly). Left tab: the imposed 8×8 lattice — click a unit and the blob perturbs its <em>grid</em> neighbors, a mixed bag of unrelated functions. Right tab: the same units laid out by their activation-correlation graph — click the same unit and the heat kernel spreads along the wiring, recruiting exactly its co-firing partners. Drag the diffusion-time slider to watch the "radius" anneal. Same click, very different move.</p>
+</blockquote>
+<p><strong>One more schedule fact ties the section together:</strong> blob radii, edit counts, temperature, and even the <em>mix</em> of move types (blob-heavy early → transfer-heavy late) all want to anneal in concert; a run annealing the move mix alone hit 90.8% with no hidden-layer topology at all. Coarse-to-fine is the universal schedule.</p>
+<p><img alt="First-layer receptive fields under three training regimes" src="https://doinfinitely.github.io/legible-networks/images/post1/filters.png" />
+<em>First-layer excitatory rows. Backprop (left) learns sparse stroke templates; plain annealing (middle) leaves salt-and-pepper; topology-aware proposal moves (right) grow dense, contiguous receptive fields.</em></p>
+<h2>Interlude: delta evaluation, or how the annealer got 50× cheaper</h2>
+<p>A structural observation made everything after it affordable. A mutation touches one row — so scoring a mutant doesn't need a full forward pass. Cache the parent's activations once, then propagate only the rank-1 consequence of the edit: the perturbed row changes one pre-activation (<code>dz = a·ΔW_row</code>), which flows through a single outer product into the output layer. The result is <strong>exact</strong> (self-checked against full forward passes every run), costs ~50× fewer FLOPs, and turns each mutant from a 400 KB weight copy into a 3 KB edit descriptor.</p>
+<p>This moved the annealing-vs-backprop resource gap from ~6,700× to ~140×, and every subsequent experiment ran on this engine. It also quietly enabled a free lunch elsewhere: since every proposal's Δloss is now measured anyway, an online bandit over move types gets its reward signal for free — and it matched hand-tuned move mixes with zero tuning, surfacing the "save inhibition edits for late in the run" schedule before we'd noticed it ourselves.</p>
+<h2>The information ladder</h2>
+<p>The bridge between blind search and backprop turns out to be classical. Ask "what is the <em>gradient</em> of the budget-transfer move?" — which direction of moving mass between two synapses most reduces loss — and you land on known objects: the single best transfer is a pairwise Frank–Wolfe step, and applying the transfer direction to <em>all</em> coordinates at once, multiplicatively, is <strong>exponentiated gradient</strong>, a member of the <strong>mirror descent</strong> family:</p>
+<blockquote>
+<p><code>row ← row · e^{−ηg}</code>, then renormalize the row to sum to 1</p>
+</blockquote>
+<p>where <strong><code>g</code> is the gradient of the loss with respect to that row's weights</strong> (a vector, one entry per synapse) and <strong><code>η</code> is the step size</strong>. For readers who haven't met mirror descent: ordinary gradient descent takes steps that are natural for <em>Euclidean</em> geometry — fine in ℝⁿ, wrong on a simplex, where an additive step can walk off the feasible set or waste its length fighting the constraint. Mirror descent takes the gradient step in transformed coordinates chosen to match the geometry (the "mirror map"); for the simplex, the natural map is entropy, and the resulting update is exactly the multiply-by-exponentials-and-renormalize rule above — the same family as Hedge and multiplicative weights from online learning. Mass moves <em>proportionally</em>, the simplex is preserved by construction, and no reparameterization or softmax saturation is involved.</p>
+<p>Lining everything up at matched budgets gives the ladder that anchors the day:</p>
+<table>
+<thead>
+<tr>
+<th>Update rule</th>
+<th>Gradient info consumed per row</th>
+<th>Test acc.</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Random proposals + selection</td>
+<td>none</td>
+<td>90.8%</td>
+</tr>
+<tr>
+<td>Top-k pairwise Frank–Wolfe (k=32)</td>
+<td>64 coordinates, unweighted</td>
+<td>92.4%</td>
+</tr>
+<tr>
+<td>signSGD, fixed step</td>
+<td>1 bit per weight</td>
+<td>92.7%</td>
+</tr>
+<tr>
+<td>Mirror descent</td>
+<td>full magnitudes</td>
+<td>95.0%</td>
+</tr>
+<tr>
+<td>Adam + reparameterization</td>
+<td>magnitudes + curvature memory</td>
+<td>97.2%</td>
+</tr>
+</tbody>
+</table>
+<p>Each rung consumes a strictly richer signal and buys accuracy. Two null results sharpen the picture. Heat-kernel <em>smoothing of gradients</em> — the same spatial prior worth +3.2 points to blind search — is worth ≈ nothing (+0.4 max) once real gradients exist: <strong>priors substitute for information you don't have, and are redundant once you have it.</strong> And a REINFORCE-trained proposal policy <strong>rediscovered Hebb's rule from reward alone</strong> (it learned, from nothing but "did this proposal reduce loss," to propose mass toward high pre–post correlation) — yet slightly <em>hurt</em> the annealer, because pointing every proposal in the greedy direction collapses the diversity that selection feeds on.<sup id="fnref:hebbian"><a class="footnote-ref" href="#fn:hebbian">4</a></sup></p>
+<h2>When does the ladder invert?</h2>
+<p>It doesn't — on clean float32 hardware. But the point of ranking methods by the channels they consume is to ask what happens when the hardware stops honoring a channel's assumptions.</p>
+<p><strong>Quantization.</strong> Fix the update quantum δ and the weight space becomes a finite lattice.<sup id="fnref:lattice"><a class="footnote-ref" href="#fn:lattice">5</a></sup> Backprop-through-quantization (straight-through estimator) degrades gracefully as δ grows; the lattice-native annealer does something stranger — quantization <em>helps</em> it, with a sweet spot at 21 levels per weight (90.8%, the day's best flat-annealing result, using only three move types). And training natively on the lattice crushes training-in-float-then-rounding: 84.9% vs 66.3% at δ=0.2.</p>
+<p><img alt="Accuracy vs quantization level" src="https://doinfinitely.github.io/legible-networks/images/post1/quant_curve.png" /></p>
+<p><strong>Analog noise.</strong> Now simulate device physics — and let's be precise about <em>what</em> is being read and written. <strong>Write noise</strong>: every time an updated weight is <em>committed to storage</em> (the physical memory cell, in the analog-hardware picture), the stored value lands multiplicatively perturbed (<code>w·e^{σξ}</code>); you pay only for rows you actually write. <strong>Read noise</strong>: every time the stored weights are <em>read back to compute a forward pass</em>, the resulting pre-activations come back perturbed (<code>z += σξ</code>). Two different channels, corrupted independently.</p>
+<p>The symmetric law: <strong>gradient methods are robust to read noise and fragile to write noise; selection is the reverse</strong> — each method fails when the specific channel it depends on loses precision. Gradient methods batch-average away read noise, but their small, precise updates must <em>survive storage</em>: at moderate write noise (σ = 0.1–0.2), signSGD with its fixed step matched to the noise floor overtakes full mirror descent, because <em>precision below the write-noise floor is worse than a blunt step</em>. Selection writes rarely and coarsely (write-noise tolerant), but lives off <em>tiny measured loss differences between candidates</em> — differences ~100× smaller than a gradient method's batch-averaged signal — which read noise destroys first (90.8% → 66.3% from read noise alone). That read-noise fragility is the annealer's open weakness.</p>
+<p><img alt="Accuracy under analog write noise" src="https://doinfinitely.github.io/legible-networks/images/post1/noise_curve.png" /></p>
+<p><strong>Deliberation.</strong> Finally, we tried making the search <em>smarter</em> rather than better-informed: an exact convex solver for the readout layer, and MCTS (Monte Carlo tree search) over weight edits. Both fail at the synapse level in instructive ways. Solving the readout to optimality mid-training collapses the search — at a block optimum the loss saturates and the selection landscape goes flat: <em>a perfect readout is a bad teacher</em>. Edit-level tree search burns its entire budget within ~10 edits of the root.</p>
+<p>But <strong>macro-MCTS</strong> — where each tree node is not a single weight edit but a <em>chunk of annealing under a chosen strategy</em> (an operator mix × a step scale), so the tree plans the training <em>schedule</em> rather than the synapses — reached parity with the hand-tuned annealer at matched FLOPs. And it independently rediscovered the hand-designed curriculum: <strong>coarse spatial blobs alternating with functional-graph moves early, inhibition edits in the mid-game, ultra-fine budget transfers in the endgame</strong> — the same coarse-to-fine, excitation-before-inhibition schedule we'd converged on by hand (including the bandit's save-inhibition-for-late insight), plus a novel interleaving of feature-learning and readout phases we hadn't tried. Deliberation pays at the strategy level, never at the synapse level.</p>
+<p><img alt="Accuracy vs compute across all methods" src="https://doinfinitely.github.io/legible-networks/images/post1/comparison.png" /></p>
+<h2>The thesis the day earned</h2>
+<blockquote>
+<p><strong>Optimization methods are ranked by the information rate and precision of the channel they consume</strong> — full gradient magnitudes &gt; gradient signs &gt; candidate rankings — <strong>and the winner at any operating point is the method whose channel assumptions the substrate can still honor.</strong></p>
+</blockquote>
+<p>Clean digital hardware honors Adam's assumptions. Quantized weights and analog write noise progressively hand the advantage to sign-based steps and then to selection. Structural priors — spatial locality, imposed lattices, learned functional topology — are worth several accuracy points exactly when the search signal is information-poor, and approximately nothing once real gradients flow. And deliberation (solvers, tree search) pays at the level of strategy, never at the level of individual parameters.</p>
+<h2>Why this is post 1</h2>
+<p>On its own this would be a fun optimization study. What promoted it to the start of a series is what the geometry did for <em>readability</em>. Because every row is a budgeted convex combination minus bounded inhibition, magnitudes have fixed units end-to-end: composed weight products <code>W₁·W₀</code> are directly comparable digit templates, and "strong path" means something absolute.</p>
+<p><img alt="3D visualization of W = P − N for two trained networks" src="https://doinfinitely.github.io/legible-networks/images/post1/render_3d.png" />
+<em>The full network rendered as wiring, W = P − N, for two models: backprop-trained vs annealed with functional-graph moves. Edge thickness is weight magnitude — and, the point, thicknesses are comparable across the entire figure, because every neuron spends the same budget. Two circuit styles are visible at a glance: backprop wires <strong>sparsely and surgically</strong>, concentrating each neuron's budget on a few strong, specific paths, so its network looks like a spare tree of bright cables. The annealed model instead learns broad, diffuse excitation and then <strong>suppresses whole functional communities at once</strong> with coordinated inhibition — you can see entire clusters of hidden units being switched off as groups, dark bundles where backprop has nothing. Same task, same accuracy regime, visibly different characters.</em><sup id="fnref:viz"><a class="footnote-ref" href="#fn:viz">6</a></sup></p>
+<p>The question that launched the next session: if fixed-unit path products are readable on MNIST, what happens when you put a <em>language model</em> in this geometry — does interpretability's hardest instrument (reading what an activation is disposed to make the model say) become exact? That's post 2.</p>
+<hr />
+<div class="footnote">
+<hr />
+<ol>
+<li id="fn:repo">
+<p>The MNIST session lives alongside the successor <code>unit-net</code> repo; the session report is <code>SESSION_REPORT.md</code>, and every model referenced passes automated structural gates (a verifier checks row sums, bounds, and hidden-split accuracy on the saved <code>model.npz</code> artifacts — evaluation is artifact-only, so no training-loop code has to be trusted).&#160;<a class="footnote-backref" href="#fnref:repo" title="Jump back to footnote 1 in the text">&#8617;</a></p>
+</li>
+<li id="fn:theorem">
+<p>With inputs in [0,1]: <code>Pa ≤ 1</code> because each row of <code>P</code> is a convex combination of values ≤ 1, and <code>Na ≥ 0</code>, so <code>z ≤ 1</code>; ReLU then keeps activations in [0,1] inductively through the stack. The constant-1 feature appended at every layer is the only bias mechanism.&#160;<a class="footnote-backref" href="#fnref:theorem" title="Jump back to footnote 2 in the text">&#8617;</a></p>
+</li>
+<li id="fn:boltzmann">
+<p><strong>Boltzmann selection</strong>: survivors are drawn with probability proportional to <code>exp(−loss/T)</code>. At high temperature <code>T</code> this is nearly uniform — almost anything survives, maximum exploration; as <code>T → 0</code> it becomes argmax — only the best candidates survive, pure exploitation. Annealing <code>T</code> downward over the run trades exploration for exploitation on a schedule, which is what lets the search accept temporarily-worse candidates early (escaping local optima) while still converging late.&#160;<a class="footnote-backref" href="#fnref:boltzmann" title="Jump back to footnote 3 in the text">&#8617;</a></p>
+</li>
+<li id="fn:hebbian">
+<p>We find this genuinely delightful: a policy-gradient learner, given only scalar reward, converged on fire-together-wire-together as its proposal heuristic — and it <em>still</em> wasn't worth using, because exploitation-shaped proposals starve a selection method of the variance it feeds on. Evolution wants proposal <em>diversity</em> more than proposal <em>quality</em>.&#160;<a class="footnote-backref" href="#fnref:hebbian" title="Jump back to footnote 4 in the text">&#8617;</a></p>
+</li>
+<li id="fn:lattice">
+<p>Finite but astronomically so: at δ=1/32 the constraint set contains ~10^81,211 networks. Naming one takes only ~270 kilobits, which is arguably the honest information-theoretic size of the learning problem.&#160;<a class="footnote-backref" href="#fnref:lattice" title="Jump back to footnote 5 in the text">&#8617;</a></p>
+</li>
+<li id="fn:viz">
+<p>The static render is a frame from an interactive 3D explorer (top-k edge slider, hover cones, click any neuron to see its weight image and composed receptive field), which we'll host alongside the widgets — it's genuinely more convincing when you can rotate it.&#160;<a class="footnote-backref" href="#fnref:viz" title="Jump back to footnote 6 in the text">&#8617;</a></p>
+</li>
+</ol>
+</div>

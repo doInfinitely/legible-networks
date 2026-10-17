@@ -1,0 +1,158 @@
+<p><em>Post 5 of the <strong>Legible Networks</strong> series (<a href="https://doinfinitely.github.io/legible-networks/04-anatomy-of-a-blind-spot.html">post 4</a> told the Go version of this story). Source: the writeup</em> The Stack the Model Never Read: Latent Structure, Its Mechanism, and Its Elicitation in a Language Model <em>in the <code>explainable_ai</code> repo. All experiments run on the exactly function-preserving unit-budget reconstruction of Qwen2.5-0.5B from <a href="https://doinfinitely.github.io/legible-networks/03-your-network-is-already-a-unit-net.html">post 3</a>, with inputs built at the token-id level so byte-pair merges can't pre-digest the structure. Interactive figures continue the series numbering.</em></p>
+<p><em>The whole series is also readable as a <a href="https://doinfinitely.github.io/legible-networks/">self-contained site</a> with the interactive figures embedded inline.</em></p>
+<p><strong>Epistemic status:</strong> the strongest experimental design in the series — exhaustive input families (<em>every</em> bracket string up to a length bound; no sampling questions), every instrument calibrated on ground truth before it touches the model, and interventions with matched controls throughout. One early claim ("the counter is behaviorally inert") was corrected by our own later certification protocol; the corrected version is presented inline, marked, with the full story in post 6. One model, one scale, one grammar family — the limitations section of the source paper is worth reading in full.</p>
+<hr />
+<h2>The puzzle</h2>
+<p>Ask what formal machine a language model implements for nested structure. We asked at three levels of description — its internal <em>directions</em>, its individual <em>units</em>, and its <em>behavior</em> — and got three different answers. The disagreement became the finding:</p>
+<ul>
+<li><strong>As a representation</strong>, the model carries a genuine soft <strong>stack</strong> in its residual stream — slot-addressable, pop-surviving, distractor-robust, causally writable, believed by the model's own downstream layers.</li>
+<li><strong>As a behavior</strong>, the model tracks the stack's top only at depth 1 and is at chance by depth 7, because its output circuit reads a cheaper structure entirely: an unordered <strong>bag</strong> of owed closers.</li>
+<li><strong>After ~100k tokens of targeted finetuning</strong>, a consumer for the stack gets wired in, conflict accuracy jumps from chance to 0.93, and a steering intervention that was a pre-registered null becomes 0.997 behavioral control — <em>through the exact direction identified beforehand</em>.</li>
+</ul>
+<p>We think this is a complete, causally-verified instance of the <a href="https://www.alignmentforum.org/posts/qHCDysDnvhteW7kRd/arc-s-first-technical-report-eliciting-latent-knowledge">eliciting-latent-knowledge</a> problem in a real model, with the elicitation actually performed. The design law it suggests: <strong>representations arise cheaply as byproducts; what training rations is consumers.</strong></p>
+<h2>1. Making the Chomsky hierarchy measurable</h2>
+<p>The vehicle is bracket strings — <a href="https://en.wikipedia.org/wiki/Dyck_language">Dyck languages</a>, the formal-language name for balanced brackets: Dyck-1 has one bracket type <code>( )</code>, Dyck-2 has two, <code>( )</code> and <code>[ ]</code>, where each closer must match its opener. They're the canonical vehicle because the <a href="https://en.wikipedia.org/wiki/Chomsky_hierarchy">Chomsky hierarchy</a> hands you unambiguous ground truth about what machinery each predicate <em>requires</em>: some properties need only finitely many states (<strong>regular</strong> — a lookup table over a finite memory), some need an unbounded <strong>counter</strong> (how deep am I?), and some need a full <strong>stack</strong> (what exact sequence of closers do I owe, in order?). And exhaustive families — every string up to a length bound — kill sampling questions dead.</p>
+<p>First, an instrument. For any yes/no signal over strings, compute a lower bound on the states of a deterministic automaton consistent with its verdicts on all strings up to length L: find prefixes that some shared continuation provably <em>distinguishes</em> (they lead to different verdicts), in the spirit of <a href="https://en.wikipedia.org/wiki/Myhill%E2%80%93Nerode_theorem">Myhill–Nerode</a> — distinguishable prefixes must occupy different states, so counting them bounds the machine from below. Plot that bound against the horizon L, and the Chomsky tier becomes a <em>curve shape</em>, calibrated exactly on ground truth:</p>
+<table>
+<thead>
+<tr>
+<th>predicate</th>
+<th>states vs horizon</th>
+<th>tier</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>length parity</td>
+<td>2, 2, 2, 2</td>
+<td>regular (<strong>flat</strong>)</td>
+</tr>
+<tr>
+<td>depth &gt; 1 (Dyck-1)</td>
+<td>5, 7, 9, 11, 13</td>
+<td>counter (<strong>linear</strong>)</td>
+</tr>
+<tr>
+<td>Dyck-2 valid-so-far</td>
+<td>4, 8, 16, <strong>32</strong></td>
+<td>stack (<strong>doubling</strong> — reachable stack contents, exactly)</td>
+</tr>
+</tbody>
+</table>
+<!--WIDGET:tier_diagnostic-->
+<blockquote>
+<p>🕹️ <strong>Interactive Figure 10 — <a href="https://doinfinitely.github.io/legible-networks/widgets/tier_diagnostic.html">The tier diagnostic, computed live</a>.</strong> Pick a predicate and the widget computes the distinguishable-prefix bound in your browser — no canned numbers — reproducing the table above: flat for parity, linear for the counter, doubling for the stack (with a log-scale toggle that turns the doubling row into a straight line). One instrument, three Chomsky tiers, separated on finite data.</p>
+</blockquote>
+<p>One honesty note that matters downstream: noise <em>inflates</em> this bound (misclassified strings masquerade as state structure), so on continuous model readouts it certifies only "at least," and the capacity claims below rest on decoding accuracy instead.</p>
+<p><img alt="The tier ladder" src="https://doinfinitely.github.io/legible-networks/images/post5/ls1_ladder.png" /></p>
+<h2>2. The counter: three answers at three levels</h2>
+<p>On Dyck-1 (all 8,190 strings, length ≤ 12), nesting <strong>depth</strong> — the counter — lives in the model at three different fidelities simultaneously:</p>
+<p><strong>As a direction: essentially exact.</strong> Ridge regression finds depth linear in the residual stream at R² = 0.993, with held-out adjacent-depth AUC 1.00<sup id="fnref:auc"><a class="footnote-ref" href="#fn:auc">1</a></sup> — the code distinguishes depth 4 from depth 5 without error — present from layer 4 of 24 onward. (A later sharpening, which becomes post 8's opening theme: the <em>information</em> is present from layer 4, but the encoding direction <em>rotates</em> across depth — cos(layer 4, layer 24) = 0.055 — and yet a single unsupervised linear alignment of layer states transports the probe across twenty layers at 96–99% of ceiling. No fixed direction carries the counter; a coherently drifting frame does. All steering below uses directions fit at the injection layer and is unaffected.)</p>
+<p><strong>As a unit: a bounded shadow.</strong> The best single unit of all 22,400 (|r| = 0.84) decays <em>compressively</em> — equal depth increments produce shrinking activation steps, a <a href="https://en.wikipedia.org/wiki/Weber%E2%80%93Fechner_law">Weber–Fechner</a> code, like human perception of loudness — and its extracted machine plateaus at 11 states: a bounded counter, regular in the limit.</p>
+<p><strong>As a behavior: barely consulted.</strong> The close-versus-open logit gap distinguishes depth 0 from positive and then, per-string, nothing. <em>(Corrected 7/25 — the original reading "memoryless" was a readout artifact. The stricter certification protocol of post 6, patching with real state differences rather than synthetic writes, shows the gap's mean gradient with depth — <strong>−0.32 logits/depth</strong> of graded caution — is real and causally driven by the depth carrier, at 5× the magnitude-matched random control; per-string AUC sat at chance only because within-depth variance swamps it. The counter is weakly consumed, not orphaned.)</em></p>
+<p>So: super-regular at the direction level, regular at the unit level, weakly-consulted at the behavioral level — post 4's slogan (<em>automata belong to directions; channels are shadows</em>) with a third rung added below.</p>
+<p>And a sharp contrast case that previews the whole series' corrected law. The <em>other</em> half of the validity machine is the sticky "went negative" flag: the bit that turns on permanently the moment a prefix closes more brackets than it ever opened (once invalid, always invalid). It too is represented — decodable at AUC 1.00 from layer 2, even earlier than the counter, as befits an attention-cheap sticky OR.</p>
+<p>But unlike the counter, <strong>the flag has a strong consumer</strong>, and the test for that is worth spelling out. There is exactly one situation where the flag changes what the correct next token <em>is</em>: depth 0. On a still-valid prefix at depth 0, closing is illegal (it would go negative), so a model consulting the flag should lean hard against closing; on an already-dead prefix at depth 0, nothing is at stake either way. Measured: the close-vs-open gap sits at −0.43 on valid depth-0 prefixes (leaning open — correct) and at +5.00 on dead ones — a <strong>+5.4-logit swing driven by the flag, precisely at the one place the flag is decision-relevant</strong>. And at matched mid-depths — where closing is legal regardless and the flag <em>shouldn't</em> change the choice — the flag's value moves the gap not at all. The flag is consumed exactly where, and only where, consuming it pays.</p>
+<p>Two components of one machine, maintained side by side: the flag <em>strongly</em> wired (+5.4 logits at the boundary where prediction pays most), the counter <em>weakly</em> wired (−0.3 logits/depth of graded caution). Consumers are rationed — by <strong>gain</strong>, not by existence.</p>
+<h2>3. The soft stack</h2>
+<p>Dyck-2 (all 87,380 strings, length ≤ 8, invalid strings included — <em>which</em> continuations remain valid is exactly what reveals a stack) upgrades the target from a number to an ordered sequence. The stream holds it:</p>
+<ul>
+<li>The k-th-owed closer decodes at <strong>0.979 / 0.930 / 0.862 / 0.819 / 0.722</strong> across stack slots 1–5.</li>
+<li><strong>It's retrieval, not echo.</strong> Here's the confound this control exists to kill: if the last token of the prefix is an opener — say <code>[</code> — then "the top of the stack is <code>[</code>" is readable by simply <em>echoing the most recent token</em>, no stack required. The control: restrict to prefixes that end in a <em>closer</em>. There, the last event was a pop, so the current top is an opener pushed several tokens ago that has just <em>become top again</em> by surviving that pop — and any reader that merely echoes the last token now fails, because the last token is a closer, not the top. Under this restriction the direction still decodes the top at 0.965. The best apparent top-of-stack <em>unit</em> (|r| = 0.843 on unrestricted data — a very convincing-looking neuron) collapses to a coin flip, 0.505: everything it "knew" was the most recent token. Genuine post-pop retrieval exists at the direction level and at <strong>no unit whatsoever</strong>.</li>
+<li><strong>It survives distractors</strong>: with an English sentence prepended, the summary decodes at 0.997 — better than clean.</li>
+<li><strong>It's causally writable, slot by slot</strong>: steering the top-of-stack direction flips the network's <em>own downstream reading</em> of the top (a decoder eight layers later, fit on clean states) bidirectionally at 0.992 / 0.017, while the slot beneath survives at 0.76–0.81. A norm-matched random vector achieves neither — and destroys slot 2. Slots are approximately independently addressable coordinates.</li>
+</ul>
+<p><img alt="The soft stack" src="https://doinfinitely.github.io/legible-networks/images/post5/ls2_stack.png" /></p>
+<p>By every internal test we could devise, the network <em>believes</em> its own stack.</p>
+<h2>4. The dissociation, and the hunt for the reader</h2>
+<p>Behaviorally: the model prefers the correct closer at 0.92 for depth-1 stacks, 0.70 by depth 3, chance by depth 7. And the obvious handle doesn't move it — last-position steering of the very direction the network's own layers believe shifts the <em>choice</em> no better than matched noise.<sup id="fnref:allpos"><a class="footnote-ref" href="#fn:allpos">2</a></sup></p>
+<p>Three hypotheses for what the output circuit actually reads, each with a designed experiment, each a failure:</p>
+<ul>
+<li><strong>Hypothesis 1 — attention matching.</strong> The canonical mechanism everyone expects: some circuit attends from the current position back to the <em>matching opener</em> and copies its identity (the induction-head style story). If that's the reader, then the opener's internal representation is causally load-bearing — so swap it. Take a string; build its <em>twin</em>: the identical string with just the top opener flipped <code>(</code> ↔ <code>[</code> (still grammatical, and the correct closer flips with it). Patch the opener position's activations from the twin into the original. If behavior reads that opener, the answer should flip to the twin's answer. Result: the fraction of prefixes on which the model's choice follows the <em>twin's</em> correct answer rises from 0.295 to 0.409 — real and position-specific (patching a control position does nothing), but <strong>eleven percentage points of choice probability, where the hypothesis predicts crossing to a solid majority</strong>. Whatever the opener representation contributes, it's a minority sharehold in the decision.</li>
+<li><strong>Hypothesis 2 — a matching head.</strong> Maybe the mechanism is literal: one attention head that looks from the last position back at the top opener. Scan every head in the model for exactly that pattern. The best candidate attends to the opener at only <em>twice the uniform baseline</em> — barely above "not looking anywhere in particular" — and it lives in layer 0, far too early to implement matching. <strong>No such head exists.</strong></li>
+<li><strong>Hypothesis 3 — interference.</strong> Maybe the stack summary is only cleanly readable in our sterile bracket-only inputs, and in anything resembling real text it drowns — so behavior <em>couldn't</em> use it even if it wanted to. The distractor test says the opposite: prepend an English sentence and the summary decodes at 0.997 — <em>better</em> than clean — with behavior unchanged. The representation is robust; the excuse is not available.</li>
+</ul>
+<p>The three failures share a shape: behavior is <em>insensitive to every single position</em> (patch one, almost nothing; steer one, nothing) <em>and exquisitely sensitive to all positions at once</em> (the every-position injection flips 97%). That shape has a name.</p>
+<h2>5. The bag</h2>
+<p>The readout that fits: an unordered <strong>bag</strong> of owed closers — sum over positions, no order. Bag and stack agree at depth 1 and diverge below, matching the accuracy curve. And a bag makes a prediction a stack flatly contradicts: define the <strong>conflict prefixes</strong> as those where the true top-of-stack disagrees with the <em>majority</em> of owed closers (you owe <code>] ) )</code> — the stack says close <code>]</code>, the bag says <code>)</code>). A bag-reader follows the majority there. Measured, on data already in hand:</p>
+<blockquote>
+<p>Conflict-prefix accuracy: <strong>0.500 / 0.473 / 0.492 / 0.483</strong> at depths 3–6 — exact chance, everywhere — versus 0.76–0.95 when top and majority agree.</p>
+</blockquote>
+<p>The fitted readout, with terms glossed: <code>gap</code> (the logit preference between the two closers) ≈ <strong>−2.33 + 0.77·(top identity) + 3.53·(bag composition)</strong> — the truth's coefficient a sixth of the bag's, the bag carrying 6× the variance, and the intercept a standing lean toward <code>]</code>.</p>
+<!--WIDGET:stack_vs_bag-->
+<blockquote>
+<p>🕹️ <strong>Interactive Figure 9 — <a href="https://doinfinitely.github.io/legible-networks/widgets/stack_vs_bag.html">Stack vs bag</a>.</strong> Build a bracket prefix and watch three readers disagree: the true stack (ordered, LIFO), the bag (two tallies, no order), and the model's fitted readout. The conflict lamp lights when top and majority diverge — the prefixes where the pre-finetune model drops to chance — and the pre/post-finetune toggle swaps the coefficients (bag 3.53 → 1.34, top 0.77 → 6.00) to show the same prefix read correctly after §6's elicitation. A generator button samples conflict prefixes for you.</p>
+</blockquote>
+<p>Even the intercept is economics rather than pathology. Raw token frequency predicts the <em>opposite</em> lean (<code>)</code> outnumbers <code>]</code> 2.6:1 in a 2.2M-character sample) — but bracket <em>spans</em> run the right way: square brackets close at a median of 5 characters vs 13 for parentheses. Conditional on an open bracket somewhere behind you, <code>]</code> arrives sooner — so "lean <code>]</code> when you've lost track" is the rational hazard-rate prior for exactly the deep-stack situations where a bag-reader <em>has</em> lost track.</p>
+<p>One equation retrodicts <strong>seven</strong> previously separate measurements: the depth-1 accuracy and its decay (bag = top at depth 1); the <code>]</code>-bias; the all-positions steering flip (every bag contribution shifts at once); the last-position steering null (one position is a 1/L shareholder in a sum); the twin patch's +11 points (one bag element's worth of logits — flips only marginal cases); the absence of matching heads (a sum needs only diffuse attention); the distractor robustness (counting features don't care about interleaved text). When your cheap-heuristic hypothesis predicts your steering nulls to the decimal, you can stop arguing about whether the representation "really" drives behavior.</p>
+<p><img alt="The bag" src="https://doinfinitely.github.io/legible-networks/images/post5/ls3_bag.png" /></p>
+<p>Why build a pristine stack and read a bag? Because on natural text — where deep nesting is rare and inconsistently closed even by humans — top and bag agree almost always; the bag is cheaper to read, and the loss never paid for the difference. The stack exists as a byproduct of whatever local bookkeeping attention performs; the reader was never rationed the gain.</p>
+<h2>6. The elicitation</h2>
+<p>If the reader is missing only because the bag saturated the reward, modest targeted pressure should build it <em>out of the existing representation</em>, fast. Finetune on generated deep-nesting strings (length ≤ 32, depth-biased; 400 steps × 32 strings), tracking the conflict set and the readout decomposition:</p>
+<table>
+<thead>
+<tr>
+<th>step</th>
+<th>conflict acc</th>
+<th>b_top</th>
+<th>b_bag</th>
+<th>intercept</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>0.494</td>
+<td>+0.77</td>
+<td>+3.53</td>
+<td>−2.33</td>
+</tr>
+<tr>
+<td>25–100</td>
+<td>~0.50</td>
+<td>~0</td>
+<td>~0</td>
+<td>~0</td>
+</tr>
+<tr>
+<td>150</td>
+<td><strong>0.902</strong></td>
+<td>+2.12</td>
+<td>+0.17</td>
+<td>−0.97</td>
+</tr>
+<tr>
+<td>400</td>
+<td>0.927</td>
+<td><strong>+6.00</strong></td>
+<td>+1.34</td>
+<td>−0.17</td>
+</tr>
+</tbody>
+</table>
+<p>The consumer is built <strong>between steps 100 and 150 — roughly 100k tokens</strong> — after a transient in which the old readout is wiped before the new one assembles. The coefficients trade places; the <code>]</code>-bias is erased. And the closure test: <strong>the steering intervention that was a null before the finetune becomes near-total, fully specific control</strong>. (α here is the steering <em>dose</em> — the multiplier on the injected direction, <code>state ← state + α·v</code>. The vector <code>v</code> is the difference between the model's own mean internal states for the two classes — <code>]</code>-topped minus <code>)</code>-topped prefixes — so α = 1 displaces the state by exactly the amount that <em>actually having the other top</em> would; α = 0.5 is half that displacement, α = 2 double.) Last-position steering now flips behavior at 0.561 / 0.891 / <strong>0.997</strong> for α = 0.5 / 1 / 2, while the matched random control lies flat at 0.02 at every dose. The new reader consumes <em>exactly the direction identified in §3, before the finetune was run</em>.</p>
+<p><img alt="The elicitation" src="https://doinfinitely.github.io/legible-networks/images/post5/ls4_finetune.png" /></p>
+<p>The control condition calibrates the speed. The same budget spent on close-the-<strong><em>oldest</em></strong> — whose target is the weakly-represented deep slot (0.72–0.86 decodable, vs the top's 0.98) — learns unstably (0.35 → 0.67 → 0.10 → 0.59), finishes at 0.791 vs 0.975, and remains bag-dominated (b_bag +5.23). <strong>The finetune did not teach the model a stack; it wired a reader to the stack the model had.</strong> Elicitation is fast precisely when the representation already exists.</p>
+<p><img alt="The closure" src="https://doinfinitely.github.io/legible-networks/images/post5/ls5_closure.png" /></p>
+<h2>7. Why this matters</h2>
+<p>For the ELK-flavored discourse, this specimen has properties the thought experiments usually have to stipulate:</p>
+<ol>
+<li><strong>Ground truth is exact.</strong> Dyck membership is decidable, and the family is exhaustive — no debate about what the model "should" know.</li>
+<li><strong>The latent knowledge is certified causal, not just probed.</strong> The standard caution about probing results (<a href="https://arxiv.org/abs/1909.03368">Hewitt &amp; Liang, 2019</a>) is that the probe, not the model, might do the work. Here the network's own downstream layers demonstrably read the steered value — the knowledge just doesn't reach the output.</li>
+<li><strong>The gap has a mechanism, not a mystery.</strong> Not "the model is hiding something" — the output circuit runs a nameable cheaper algorithm whose on-distribution agreement with truth explains, quantitatively, why training never closed the gap. A behavioral eval would rate this model "can't do deep nesting"; the truth is "knows, doesn't consult."</li>
+<li><strong>Elicitation is cheap, verifiable — and does not automatically generalize.</strong> The success signature here is as clean as it gets: a pre-registered direction, a pre-registered null, and the null flipping to 0.997 control through that direction. But the <em>identical recipe</em> applied to KataGo's chain-safety blindness fixed the behavior while the closure test came back <strong>null</strong> — the repair routed <em>around</em> the identified representation. The honest summary of interpretability-guided training as we currently understand it: <strong>a finetune builds a consumer, but not necessarily the consumer you identified</strong> — and only a post-hoc closure test tells you which happened. (Plus one warning from that failure mode worth engraving somewhere: distilling from a teacher that shares the blindness first fixes it and then faithfully <em>re-teaches</em> it. Label provenance is part of the mechanism.)</li>
+</ol>
+<p>The safety-relevant corollary cuts both ways. Latent capabilities can sit much closer to the surface than behavior suggests — one small finetune from active — and behavioral evals systematically conflate "can't" with "doesn't consult." When a model appears unable to do something its scale suggests it should, consider that the deficit may live in the reader, not the representation.</p>
+<p>Next, the paper that put all of this on trial: we had claimed two representations were behaviorally orphaned — the depth counter here and a chain-safety axis in KataGo — and a stricter certification protocol convicted <em>both</em> claims, replacing the orphan story with a quantitative law about gain. <a href="https://doinfinitely.github.io/legible-networks/06-consumers-and-the-gain-ledger.html">Post 6: Consumers, Not Representations — and the Gain Ledger</a>.</p>
+<hr />
+<div class="footnote">
+<hr />
+<ol>
+<li id="fn:auc">
+<p>AUC — area under the ROC curve for a binary discrimination; 0.5 is chance, 1.0 is perfect separation. "Adjacent-depth AUC 1.00" means the decoder separates depth k from depth k+1 without a single error, at every k.&#160;<a class="footnote-backref" href="#fnref:auc" title="Jump back to footnote 1 in the text">&#8617;</a></p>
+</li>
+<li id="fn:allpos">
+<p>With one telling exception that foreshadows the answer: inject the vector at <em>every</em> position simultaneously and behavior does flip — bidirectionally and class-specifically (97%, a signature generic disruption can't produce). Something reads the sequence broadly and ignores the last-token summary. Hold that thought for one section.&#160;<a class="footnote-backref" href="#fnref:allpos" title="Jump back to footnote 2 in the text">&#8617;</a></p>
+</li>
+</ol>
+</div>

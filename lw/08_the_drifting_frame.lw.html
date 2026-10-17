@@ -1,0 +1,243 @@
+<p><em>Post 8, the finale of the <strong>Legible Networks</strong> series. Sources: the writeups</em> The Drifting Frame <em>and</em> The Program Atlas <em>in the <code>explainable_ai</code> repo, with their follow-up instruments (frame kinematics, checkpoint archaeology, the deviation lens, the canalization and cross-run tests). This is where the exact instrument built across posts 1–3 gets run to the end of its rope — and what it reports is a negative result so total it becomes a positive theory. Interactive figures continue the series numbering.</em></p>
+<p><em>The whole series is also readable as a <a href="https://doinfinitely.github.io/legible-networks/">self-contained site</a> with the interactive figures embedded inline.</em></p>
+<p><strong>Epistemic status:</strong> the conservation and cancellation results are closed-form arithmetic on an exactly row-stochastic network, now replicated across two architectures (post- and pre-activation trunks), two games, and two board sizes, with rate constants agreeing to the second decimal. The frame results replicate across a conv-ResNet and a transformer. The atlas results are anchored on one chess network but their key claims carry independent checks: an exact-solver ground-truth leg (KPvK), a lobotomy-invariance test, a <em>cross-training-run</em> replication, and a five-domain generalization of the closing law. Where a claim rests on one net or one corpus, we say so.</p>
+<hr />
+<h2>The puzzle</h2>
+<p>The unit-net geometry was built for one instrument above all: <strong>conserved path mass</strong>. On an exactly <a href="https://en.wikipedia.org/wiki/Stochastic_matrix">row-stochastic</a> skeleton, every neuron's unit budget splits exactly over its inputs, so "how much of this output came through that unit" has a well-defined, comparable, certifiable answer. Posts 1–3 built the geometry; this post runs the instrument to its logical end on a superhuman chess network and asks the question the whole series was pointed at:</p>
+<blockquote>
+<p><em>What does exact attribution say about a deep network?</em></p>
+</blockquote>
+<p>The answer, in three measurements: almost nothing, almost nowhere — for a reason with rate constants — and the shape of the <em>nothing</em> turns out to be a theory of what deep computation is instead.</p>
+<p>A convenient miracle to start: Leela T70's trunk needs no transplant at all. Every one of its 2,688 conv rows sits at positive row-sum 1.0000 — min = median = max, to 1.5×10⁻⁷ — because its conversion pipeline had already folded the scale debt.<sup id="fnref:native"><a class="footnote-ref" href="#fn:native">1</a></sup> The precondition for exact bookkeeping holds natively, verified at joint KL 0.0000 and −3 Elo in arena play.</p>
+<h2>1. Evaporation: where the positive mass goes</h2>
+<p>Track backward positive path mass from the trunk tip toward the input, on 256 real positions. Two sinks, one dominant:</p>
+<table>
+<thead>
+<tr>
+<th>depth reached (of 20 convs)</th>
+<th>20</th>
+<th>16</th>
+<th>12</th>
+<th>8</th>
+<th>4</th>
+<th>input</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ceiling (padding losses only)</td>
+<td>0.848</td>
+<td>0.564</td>
+<td>0.409</td>
+<td>0.300</td>
+<td>0.219</td>
+<td>0.161</td>
+</tr>
+<tr>
+<td>realized (gated)</td>
+<td>0.391</td>
+<td>0.001</td>
+<td>0.000</td>
+<td>0.000</td>
+<td>0.000</td>
+<td>0.000</td>
+</tr>
+</tbody>
+</table>
+<p>The padding sink is real but minor (~8%/layer: kernel taps that read off-board). The gates are the story: realized positive mass decays at <strong>~0.25× per convolution</strong>, identically across game phases — there are no purely-positive chains of active units of any depth. And this constant is a <em>law</em>, not a quirk: replicated on KataGo's 19×19 pre-activation trunk, the per-conv gate factor comes out <strong>0.250</strong> — same number, different game, different architecture, different board size.</p>
+<p><img alt="The two sinks" src="https://doinfinitely.github.io/legible-networks/images/post8/df1_evaporation.png" /></p>
+<h2>2. Effective depth: the visible computation is 1–2 blocks deep</h2>
+<p>Include the skip connections (excluded above by convention) and apportion each residual summation between branch and skip by measured magnitude share; charge each branch traversal its measured gated retention (ρ ≈ 0.03–0.06); a generating function over blocks then yields the exact distribution of tip-visible evidence by number of conv-blocks traversed. Result: <strong>median 1–2 blocks of 10</strong> (P(≤2) = 0.69–0.91), because a conv hop costs ~25× a skip hop. The range spans two apportioning conventions, both shown in the figure: "full" splits each summation by the raw magnitudes as they stand, while "<strong>beta-free</strong>" first excludes the squeeze-excitation layers' broadcast bias constants (their β terms) from the split — those are position-independent constants that inflate the branch's apparent magnitude share roughly 2× without carrying any per-position signal, so the beta-free row is the more conservative reading. The conclusion is the same under either bookkeeping; conventions like this bite, which is why we always run both. This is <a href="https://arxiv.org/abs/1605.06431">Veit et al.'s</a> shallow-ensembles picture — deep ResNets behave like ensembles of short paths — upgraded from lesion study to closed-form arithmetic on a certified skeleton. (On KataGo it's <em>more</em> extreme: skip-dominated summations put 84% of tip-visible mass at depth <strong>zero</strong>.)</p>
+<p><img alt="Effective depth" src="https://doinfinitely.github.io/legible-networks/images/post8/df2_depth.png" /></p>
+<p>The complementary magnitude fact keeps this from being misread as "the network is shallow": the <em>branches</em> dominate every summation's magnitude (skip share ≤ 0.41 in T70). The blocks <strong>rewrite</strong> the stream at every step; the ledger-visible remnant merely rides it. Deep computation is happening — the positive ledger just can't see it. Which raises the question §3 answers terminally: could <em>any</em> extension of the books see it?</p>
+<h2>3. Total cancellation: the terminal statement</h2>
+<p>Extend the ledger to signed mass — backward flow through a positive weight preserves support sign, through a negative weight flips it, both gated. One convolution below the tip, the cancellation coefficient |net|/gross is <strong>0.121</strong>. By five convolutions: <strong>0.000, to float64 precision</strong>, with the flipped-support share pinned at exactly one-half — every unit more than a couple of convs from the tip supports the output through positive and negative path families in <em>perfect balance</em>. Replicated on KataGo: 0.115 at one hop (T70: 0.121), identically zero by four convs. Two architectures agree on how fast the signed books balance, to the third decimal of the first hop.</p>
+<p><img alt="Total cancellation" src="https://doinfinitely.github.io/legible-networks/images/post8/df3_cancellation.png" /></p>
+<p>Sit with what this means. <strong>No static path algebra — positive, signed, skip-inclusive, however refined — carries net information at depth in these networks.</strong> The function is not in the paths; it is in the data-dependent <em>selection</em> among perfectly balanced path families. Attribution must be data-conditional or it is nothing. This is the mechanistic ground under a decade of practical folklore about why weights-only saliency methods disappoint — here it's not folklore, it's a rate constant.</p>
+<h2>4. Persistence: information stays; encodings rotate</h2>
+<p>So what <em>is</em> the deep stack doing, if not accumulating attributable support? Decode nameable features at every block. <strong>Material</strong> (the piece-value balance) stays decodable across the full trunk — R² 0.99 → 0.91 — while its decoder direction rotates to orthogonality: adjacent-block cosines ~0.67, compounding to <strong>0.04 end-to-end</strong>. Castling rights: same. Mobility is visibly <em>computed</em> mid-trunk (R² rises 0.74 → 0.89).</p>
+<p>And the bridge measurement corrected our own earlier framing. Post 5 described Qwen's bracket-depth counter as "built by layer 4 and carried to 24" — but only its flat R² had been measured. Its direction rotates just as completely: cos(L4, L24) = <strong>0.055</strong>. <strong>Flat R² masks rotation, in both architectures</strong> — a conv-ResNet and a transformer. The artifact check that makes the rotation real rather than probe non-uniqueness: naive cross-layer probe <em>transfer</em> fails outright (a decoder fit at layer 4, applied at layer 12, scores R² = −1.9 — worse than predicting the mean).</p>
+<h2>5. The drifting frame</h2>
+<p>Is that rotation per-feature re-encoding (each feature individually rewritten — computation) or a <em>global frame drift</em> (one coordinate system turning — kinematics)? The discriminating test: fit an <strong>unsupervised</strong> linear alignment between layer states — knowing nothing about any feature — and transport the probe through it.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>naive transfer</th>
+<th>full-linear aligned</th>
+<th>orthogonal (<a href="https://en.wikipedia.org/wiki/Orthogonal_Procrustes_problem">Procrustes</a>)</th>
+<th>refit ceiling</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Qwen depth, L4→L24</td>
+<td>−1.06</td>
+<td><strong>+0.93</strong></td>
+<td>+0.69</td>
+<td>+0.97</td>
+</tr>
+<tr>
+<td>T70 material, b0→b9</td>
+<td>−1.09</td>
+<td><strong>+0.96</strong></td>
+<td>+0.71</td>
+<td>+0.99</td>
+</tr>
+</tbody>
+</table>
+<p>Alignment restores transfer to <strong>96–99% of the refit ceiling</strong>, in both architectures, with a pure rotation recovering most of it. One blind-fit map serves <em>all</em> features at once (material, mobility, castling, piece count — 97–100% of each ceiling through the same matrix); the maps <em>compose</em> (nine chained adjacent-pair maps ≈ the direct map); and the drift is <em>steady</em> — adjacent Procrustes rotations average <strong>45.5° ± 8° per block</strong> against a 90° random baseline, a constant-rate turn that fully scrambles absolute directions in 2–4 blocks, exactly matching the cosine decays.</p>
+<p><img alt="The frame result, both architectures" src="https://doinfinitely.github.io/legible-networks/images/post8/df4_frame.png" /></p>
+<blockquote>
+<p><strong>The law: information persists; the frame rotates; positions within the frame hold.</strong></p>
+</blockquote>
+<!--WIDGET:rotating_frame-->
+<blockquote>
+<p>🕹️ <strong>Interactive Figure 13 — <a href="https://doinfinitely.github.io/legible-networks/widgets/rotating_frame.html">The rotating frame</a>.</strong> A feature direction turning ~45° per block, a probe frozen at its fit layer, and the transfer R² collapsing as depth accumulates — then the <em>align first</em> toggle, which co-rotates the probe through the blind-fit map and holds the read at ceiling across the whole stack. The practical moral for anyone who has ever applied a layer-k probe at layer k±4: it was never valid, even at flat R², and the fix is one cheap unsupervised map.</p>
+</blockquote>
+<p>Three follow-ups turn "frame" from metaphor into measured kinematics — and each lands on a series theme:</p>
+<ul>
+<li><strong>The motion is data-dependent and the features are passengers.</strong> An alignment map fit on endgames transfers poorly to openings (0.975 → 0.711): there is no single weight-level drift, only the average of gate-conditioned dynamics. Carried features are <em>passengers</em>: their own directions turn at essentially the frame's bulk rate — 48°/block for material and castling against the frame's 45.5°/block, a difference inside the jitter — while mobility, the one feature actively <em>computed</em> mid-trunk, rotates measurably faster (55°/block): being worked on adds motion beyond the carriage. And the frame is mostly <em>slack</em>: a deliberate 45° rotation at block 5 costs the policy almost nothing (KL 0.0045; −18 Elo with a confidence interval touching zero). <strong>Wander in the carrying; work in the variation.</strong></li>
+<li><strong>The frame is congenital.</strong> Checkpoint archaeology (the T70 training run recovered from the Wayback Machine) shows align-then-transfer already works at <strong>0.99 of ceiling at a near-birth checkpoint that agrees with the final policy 8% of the time</strong>. The frame is a property of architecture-plus-data, not a trained achievement; its rotation <em>rate</em> matures early (26° → 45°/block by mid-run); and — post 6's law, found in a third place — <strong>the representations were never the point</strong>: material decodes at R² 0.96 from the birth checkpoint (<em>higher</em> than the final net's 0.91). Representations are cheap from step one. What training builds, expensively and late, is the <em>play</em>.</li>
+<li><strong>The deep blocks keep moving longest</strong> — per-block similarity to the final geometry is depth-ordered at every checkpoint. The trunk freezes bottom-up.</li>
+</ul>
+<h2>6. The deviation lens</h2>
+<p>If the mean flow is passive carriage and the work rides in the input-conditioned variation, then the variation is the thing to read. Define, per block pair and position: <strong>δ(x) = z_next(x) − A·z(x)</strong> — what this block did to <em>this</em> position beyond its average transport. Four measurements:</p>
+<ul>
+<li><strong>Deviations are a third of the stream, at every depth</strong> (‖δ‖/‖z‖ = 0.35–0.47, flat) — per-block computation isn't concentrated anywhere special.</li>
+<li><strong>The mean flow is information-neutral — measured, not assumed</strong>: features decoded from the transported state match the source layer to three decimals (the <a href="https://en.wikipedia.org/wiki/Data_processing_inequality">data-processing inequality</a> with an empirical signature).</li>
+<li><strong>The increment lives in the deviation.</strong> Where mobility's decodability jumps (b5→b6), decoding it <em>from δ alone</em> peaks; material — carried, never incremented — decodes from δ at R² 0.00 at every pair. And the deviation <strong>out-reads the raw state</strong> on the newly-computed part: R² 0.400 vs 0.242 at the hottest pair — subtracting predictable carriage is a matched filter; the carried bulk is, for reading the increment, noise.</li>
+<li><strong>‖δ(x)‖ is a computation-intensity meter</strong>: partialing out piece count, it correlates most with being in check, queens on, and hanging pieces. The network works hardest, in this literal per-position sense, exactly where the position is tactically hot.<sup id="fnref:splash"><a class="footnote-ref" href="#fn:splash">2</a></sup></li>
+</ul>
+<p>Then the causal pricing, because correlational lenses invite the obvious objection. At block 6's output: emit the mean-flow prediction instead of the true state (<strong>zero-δ</strong> — carriage without this position's work); emit the mean flow plus <em>another position's</em> deviation (<strong>swap-δ</strong> — right statistics, wrong content); or add unstructured noise of exactly ‖δ‖:</p>
+<table>
+<thead>
+<tr>
+<th>intervention</th>
+<th>policy KL</th>
+<th>top-1 agreement</th>
+<th>Elo (played every move)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>zero-δ</td>
+<td>0.0324</td>
+<td>0.594</td>
+<td><strong>−237</strong> [−276, −202]</td>
+</tr>
+<tr>
+<td>swap-δ</td>
+<td>0.0422</td>
+<td>0.510</td>
+<td>—</td>
+</tr>
+<tr>
+<td>matched noise</td>
+<td>0.0130</td>
+<td>0.713</td>
+<td>−53 [−82, −24]</td>
+</tr>
+<tr>
+<td>45° frame rotation (b5)</td>
+<td>0.0045</td>
+<td>—</td>
+<td>−18 [−45, +10]</td>
+</tr>
+</tbody>
+</table>
+<p>The predicted ordering exactly: content beats statistics beats distance. Deleting one block's per-position work changes the played move in 41% of positions and costs a quarter-thousand Elo; a norm-preserving rotation of the <em>entire state</em> costs approximately nothing. <strong>The frame is slack; the deviation is load-bearing</strong> — as a causal statement with a dose curve. (One meta-lesson for the field's favorite metric: Elo-per-KL runs ~7,400 for the structured deletion vs ~4,000 for noise — <em>KL under-prices structured damage</em>.)</p>
+<h2>7. The program atlas: counting a network's situations</h2>
+<p>The frame paper ends in a content-addressed-dispatch picture: per-position Jacobians are near-orthogonal — every position runs what amounts to its own linear program, assembled by gates, and gates are set by states. If that's right, then <strong>the state is literally the address of the program the position will run</strong>, and plain cosine similarity between two positions' states should predict the distance between their <em>operators</em> — no Jacobians needed.</p>
+<p>It does: <strong>Spearman −0.878</strong> against measured Jacobian-probe distance, while every board-level similarity fails (piece-placement agreement −0.11; game phase +0.48; partial all of them out and the state kernel holds at −0.84 to −0.88). The demonstration pairs need no statistics: the dynamically-nearest positions with low board overlap share <strong>zero squares</strong> — same program, different corners of the board. <strong>Computational neighborhood is activation geometry, not board geometry.</strong> One forward pass reads a position's program address; surveys become affordable.</p>
+<p><img alt="Kernel validation" src="https://doinfinitely.github.io/legible-networks/images/post8/pa1_kernel.png" /></p>
+<p><strong>The endgame survey.</strong> 1,600 endgames spanning 154 material signatures, clustered by the kernel, clusters then <em>certified as dynamics clusters</em> (within-cluster operator distance vs between: AUC 0.90). The 154 materials collapse to <strong>six programs — and the programs ignore material</strong> (adjusted Rand index<sup id="fnref:ari"><a class="footnote-ref" href="#fn:ari">3</a></sup> vs the material partition: 0.08). What organizes them is the <strong>verdict, from the mover's seat</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>program</th>
+<th>n</th>
+<th>W/D/L</th>
+<th>dominant materials</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>convert the win</td>
+<td>442</td>
+<td>1.00/0/0</td>
+<td>KRvK, KQvK, KRPvK</td>
+</tr>
+<tr>
+<td>resist the loss</td>
+<td>459</td>
+<td>0/0/1.00</td>
+<td>KvKR, KvKRP, KvKQ</td>
+</tr>
+<tr>
+<td>fight the rook ending</td>
+<td>432</td>
+<td>.30/.43/.27</td>
+<td>KRPvKRP, KRvKRP</td>
+</tr>
+<tr>
+<td>hold the balance</td>
+<td>182</td>
+<td>.10/.79/.10</td>
+<td>KBPvKBP, KPvK</td>
+</tr>
+<tr>
+<td>fortress draw — pressing</td>
+<td>41</td>
+<td>.01/.99/0</td>
+<td>KBPvKP</td>
+</tr>
+<tr>
+<td>fortress draw — defending</td>
+<td>44</td>
+<td>0/1.00/0</td>
+<td>KPvKBP</td>
+</tr>
+</tbody>
+</table>
+<p>Three details carry it. <strong>The mirror pairs</strong>: KQvK and KvKQ — one material class — land in <em>opposite</em> programs; the program is the role, not the inventory. <strong>The contested class</strong>: the one genuinely mixed-verdict program is the rook endings — the class chess lore singles out as hardest gets its own routine with honest uncertainty, while dozens of decided materials share routines. <strong>Discovery, not construction</strong>: the clusters are built from mid-trunk states alone; the value head enters only as post-hoc description — and four of six emerge with near-pure verdicts anyway. The kernel-space embedding's dominant geometry is literally a win→draw→loss horseshoe. Programs emerge by block 3, are richest at blocks 4–6, and coarsen toward pure verdict by block 9, as the value head approaches.</p>
+<p><img alt="The six-program atlas" src="https://doinfinitely.github.io/legible-networks/images/post8/atlas_programs.png" /></p>
+<p><strong>The middlegame is a continuum — with a chart.</strong> Same instrument on 1,600 middlegames: no discrete programs (silhouettes decay with k), only a development gradient, verdict-blind. But clusterless is not structureless: human positional <em>structures</em> — fianchetto setups, locked centers, isolated queen's pawns — are readable as <strong>regions</strong> of the same geometry at 0.81–0.93 balanced accuracy. <strong>Verdicts are clusters; structures are regions</strong> — human chess theory's taxonomy is, measurably, a chart of the network's continuum.<sup id="fnref:coords"><a class="footnote-ref" href="#fn:coords">5</a></sup></p>
+<p><strong>The map is scaffold — two remarkable invariances.</strong> First, <em>canalization</em>: recompute the kernel from the Elo-priced damaged variants of §6, and even the <strong>−237-Elo lobotomy keeps 75% of every position's top-5 neighbors</strong> (CKA<sup id="fnref:cka"><a class="footnote-ref" href="#fn:cka">4</a></sup> 0.970) — better than the intact network's own drift across three blocks of depth (63%). Deleting a quarter-thousand Elo of computation moves the situation map less than walking three blocks inside the healthy net: the neighborhoods are carried by shared content, while the per-position computation — idiosyncratic by the operator results — cancels out of pairwise similarity. Second, <em>cross-run replication</em>: an independently trained network from a different Leela era (T60: different architecture, different inputs, agreeing with T70 on only <strong>54% of moves</strong>) reproduces T70's middlegame neighborhoods at top-5 overlap 0.637 — statistically indistinguishable from T70's own internal depth drift — and replicates the six-program partition at ARI 0.475. <strong>The situation map is the task's, seen through the architecture class</strong>: individual training runs carve their different play into the same geometry, which survives both lobotomy within a net and replacement of the net entirely.</p>
+<p><strong>The future is not encoded — and that's calibration.</strong> Do middlegames secretly carry their endgame destiny? No, twice: destination-conditioned middlegame clusters match random controls, and 5-NN prediction of the eventual program from the middlegame state scores <em>below</em> base rate. The crystallization curve makes the timing exact: destiny-visibility lift is zero at every distance beyond eight plies and appears only in the final bin — <strong>+0.13 at 1–8 plies out</strong>. Commitment is a phase transition at the door. Under the strong reading this is not myopia but <em>calibration</em>: between near-equal players the destination genuinely isn't determined sixteen plies out, and a representation claiming otherwise would be wrong.</p>
+<p><strong>Sub-programs against exact truth.</strong> For one material class small enough to solve exactly — KPvK, all ~400k states, retrograde solver validated on textbook cases (correcting one author's misremembered "textbook fact" along the way) — the kernel resolves <em>sub</em>-programs within the class: won-KPvK vs drawn-KPvK separate at <strong>90.7%</strong> where board geometry sits at base rate, and the network visibly solves the pawn race through its depth — easy cases early, opposition theory last, the final increment entering through the <strong>deviation channel</strong>, exactly as §6's framework predicts.</p>
+<p><img alt="KPvK through the depth" src="https://doinfinitely.github.io/legible-networks/images/post8/pa4_kpvk.png" /></p>
+<p><strong>The objective clause.</strong> Run the per-block survey on four more domains and the law is forced into its correct general form. A language model's Dyck geometry organizes by <em>recency</em> (last token, then the token before — a suffix trie, ARI 0.75–0.95) with the perfectly-represented automaton variance-subordinate everywhere — until the final layer, where recency collapses and the <em>behavioral</em> partition rises: the LM's last layer coarsens toward its verdict, and its verdict is the next token. KataGo's verdict readability <em>steps</em> exactly at its two global-pooling blocks (+0.10 at block 7, 3× any other block — emergence tied to a named architectural event). ResNet18's class organization rises monotonically to ARI 0.79 with the silhouette-optimal k landing at 11 ≈ its 10 classes — the geometry discovers the class count at the depth where the verdict is due. And natural text behaves like chess with the verdict renamed: kernel neighborhoods read the model's next token at 12× base rate exactly where continuation entropy is low — <strong>an LM's "endgames" are its low-entropy contexts.</strong> The law, final form:</p>
+<p><img alt="The objective clause across domains" src="https://doinfinitely.github.io/legible-networks/images/post8/pa5_domains.png" /></p>
+<blockquote>
+<p><strong>Cluster geometry tracks the epistemic state of the training objective's output</strong> — the verdict for value-trained game networks, the next-token decision for language models — <strong>discrete programs where it is settled, graded structure where it is being computed, continuum where it is genuinely open.</strong> Everything else the network represents is present, readable as regions or by probes, and never dominant.</p>
+</blockquote>
+<!--WIDGET:commitment_front-->
+<blockquote>
+<p>🕹️ <strong>Interactive Figure 14 — <a href="https://doinfinitely.github.io/legible-networks/widgets/commitment_front.html">The wall and the gradient</a>.</strong> How far ahead of commitment is the future readable from the state? Two measured curves, one slider. Chess: a <em>wall</em> — zero destiny information beyond eight plies, then a step (+0.13), because between equal players the future genuinely isn't determined yet. Language: a <em>gradient with a long tail</em> — the settled token reads at 5.5× base rate one token out and still 2.6× base sixteen tokens out, decaying smoothly, because single-author text telegraphs its destinations topically where adversarial games hide theirs. For the question this rehearses — when is a model's upcoming content readable before emission? — language's answer is: gradually, substantially, and by simple nearest neighbors.</p>
+</blockquote>
+<h2>Coda: the series, and what we'd ask of you</h2>
+<p>The arc in five sentences. A weight-budget geometry makes path mass exact, and optimization methods sort by the information channel they consume (post 1). Models in the geometry made interpretability's flagship lens exact, its averaged approximation measurable (3% vs 91% by regime), and task-reasoners carvable with certificates (post 2) — and pretrained superhuman networks turned out to be transplantable into the geometry exactly, without a gradient step (post 3). Pointed at real systems, the exact instruments found a certified representational hole behind a famous adversarial exploit (post 4), pristine latent structure rationed by consumer <em>gain</em> rather than existence (posts 5–6), and audit methodology that deflates ~98% of "drive" findings while measuring when search actually helps (post 7). And when the attribution ledger itself reported zero — totally, with cross-architecture rate constants — the zero had a shape (post 8): information persists, the frame rotates, the work rides in the deviations, and the network's states are the addresses of the programs it runs, organized by exactly one thing — how settled the objective's answer is.</p>
+<p>Running beneath all of it, one law surfaced independently four times — in a distilled toy's dead units, a language model's unread stack, a Go program's silent safety wire, and a chess network's birth checkpoint: <strong>representations are cheap; what training rations is consumers, and what consumers are rationed by is gain.</strong> If we had to compress the series to one sentence for the alignment discourse, it's that behavioral evaluation measures the gain schedule, not the knowledge — in both directions.</p>
+<p>What we'd most like from LessWrong: <strong>adversarial replication.</strong> The single-substrate results (the atlas's chess anchor, the elicitation specifics of post 5, the gain-ledger cohorts) are the ones we're least entitled to generalize. The repos are public, every headline number has a named script, most experiments run in minutes-to-an-hour on one GPU, and this series has now retracted or demoted five of its own findings when the kill-tests said so — we would genuinely rather you find the sixth than have the first five be the last. The comment section is open; the verifier is running.</p>
+<hr />
+<div class="footnote">
+<hr />
+<ol>
+<li id="fn:native">
+<p>With a cautionary coda that belongs in every fine-tuning conversation: a 600-step distillation "repair" launched from this exactly-legal model could only random-walk <em>away</em> from perfection (KL 0 → 0.011, −132 Elo). When the debt is already folded, training is purely a source of damage.&#160;<a class="footnote-backref" href="#fnref:native" title="Jump back to footnote 1 in the text">&#8617;</a></p>
+</li>
+<li id="fn:splash">
+<p>A pretty follow-up killed a pretty hypothesis here: we predicted forcing sequences would <em>condense</em> into tight kernel neighborhoods ("droplets"). The opposite holds — tactics <em>eject</em> positions from the bulk, each forcing line its own idiosyncratic spike ("splashes"), exactly what near-orthogonal per-position operators imply. The cross-domain contrast is the keeper: settled <em>text</em> condenses (many contexts share one determined answer — idioms); settled <em>chess tactics</em> individuate (each crisis is its own). Low entropy means "determined" in both domains; only in language do determinations come in shared families.&#160;<a class="footnote-backref" href="#fnref:splash" title="Jump back to footnote 2 in the text">&#8617;</a></p>
+</li>
+<li id="fn:ari">
+<p>Adjusted Rand index: agreement between two partitions of the same items, corrected for chance — 0 means the clusterings agree no better than random labelings, 1 means identical.&#160;<a class="footnote-backref" href="#fnref:ari" title="Jump back to footnote 3 in the text">&#8617;</a></p>
+</li>
+<li id="fn:cka">
+<p>Centered kernel alignment — the standard similarity measure between two representations' geometries (do they place the same points near each other?), invariant to rotation and scale; 1 = identical geometry.&#160;<a class="footnote-backref" href="#fnref:cka" title="Jump back to footnote 4 in the text">&#8617;</a></p>
+</li>
+<li id="fn:coords">
+<p>This section also contains the project's smallest and most instructive self-correction: diffusion-map coordinates 4 and 5 of the middlegame continuum "correlated with nothing" in a fifteen-predicate battery — because they weren't axes at all, but localized eigenvectors on same-game near-duplicate cliques (participation ratio 2.5–13), a known diffusion-map failure mode on autocorrelated corpora. The middlegame has ~2–3 genuinely global coordinates: game progress, a castling/queens phase residual, and material balance. When a coordinate correlates with nothing, check whether it's a coordinate.&#160;<a class="footnote-backref" href="#fnref:coords" title="Jump back to footnote 5 in the text">&#8617;</a></p>
+</li>
+</ol>
+</div>

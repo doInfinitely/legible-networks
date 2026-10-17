@@ -1,0 +1,300 @@
+<p><em>Post 2 of the <strong>Legible Networks</strong> series (<a href="https://doinfinitely.github.io/legible-networks/01-training-without-gradients.html">post 1: Training Without Gradients</a>). Sources: the <code>unit-net</code> Day 2 report and the <a href="https://github.com/doInfinitely/unit-net">j-carve repo</a> (task ladder, carving pilot, and the carving-dynamics memo). As before, interactive figures are hosted separately with static fallbacks; figure numbering continues from post 1.</em></p>
+<p><em>The whole series is also readable as a <a href="https://doinfinitely.github.io/legible-networks/">self-contained site</a> with the interactive figures embedded inline.</em></p>
+<p><strong>Epistemic status:</strong> empirical, one small distilled model (~3M parameters, TinyStories domain), plus an independent from-scratch character-level model for the carving-dynamics experiments. The central claims are either mathematical (exactness of the lens, verified to max reconstruction error 3×10⁻⁷) or come with predicted-vs-measured intervention effects agreeing to four decimal places. The most transferable claim — that averaged-lens fidelity is regime-dependent — is a two-condition comparison and should be treated as an existence proof, not a survey.</p>
+<hr />
+<h2>The puzzle</h2>
+<p>Post 1 ended on a question: the unit-net geometry gives every weight fixed units, so path products through the network are bounded and comparable. On MNIST that meant readable digit templates. What happens if you put a <em>language model</em> in this geometry?</p>
+<p>The stakes come from a specific instrument. Anthropic's J-lens result (July 2026)<sup id="fnref:jlens"><a class="footnote-ref" href="#fn:jlens">1</a></sup> reads what an internal activation "is disposed to make the model say" via a fitted linear transport:</p>
+<blockquote>
+<p><code>lens_l(h_l) = unembed(J_l · h_l)</code>,  where  <code>J_l = E[∂h_final/∂h_l]</code></p>
+</blockquote>
+<p>Unpacking the symbols: <code>h_l</code> is the hidden activation vector at layer <code>l</code>; <code>h_final</code> is the last-layer activation; <code>unembed</code> is the model's output projection onto vocabulary logits; and <code>J_l</code> — the lens matrix — is the <a href="https://en.wikipedia.org/wiki/Jacobian_matrix_and_determinant">Jacobian</a> of the final activation with respect to layer <code>l</code>'s activation, <strong>averaged over a corpus</strong> (that's the <code>E[·]</code>). "Jacobian" is a fancier word than the idea deserves: it's just the matrix of sensitivities — entry (i, j) answers "if the j-th coordinate of <code>h_l</code> wiggles a little, how much does the i-th coordinate of <code>h_final</code> move?" Multiplying <code>h_l</code> by it transports the activation to the output's coordinate system, where <code>unembed</code> can turn it into words. The averaging isn't a stylistic choice: a transformer's true layer-to-output map is wildly input-dependent, so any single linear lens must be a compromise across inputs.</p>
+<p>Remy's hypothesis going in: in a unit-net, no compromise is needed. With ReLU activations, the true per-input Jacobian is exactly the product of active-path effective matrices, every factor bounded by the geometry (convex excitatory rows, inhibition ≤ 1). The workspace should be readable <strong>directly off the wiring</strong> — no fitting, no averaging, exact for each input separately.</p>
+<p>That hypothesis turned out true, and it enabled three things you cannot currently get from a transformer: an exact lens, the first ground-truthed measurement of how lossy averaged lenses actually are, and concept neurons built to spec with a loss term. Then it opened a fourth door — <em>carving</em> task-specific reasoners out of the network with provable error bounds — which the second half of this post walks through, including the part where the textbook pruning method doesn't just underperform but collapses below random, for a reason specific to this geometry.</p>
+<h2>Getting an honest student (harder than the science)</h2>
+<p>First we needed a language model in the geometry. The student, <code>TokenUnitLM</code>: a shared token table (each feature unit holds a convex attention budget over the vocabulary — legible from birth) feeding a unit-net trunk; 12-token context; a reduced 2,048-token vocabulary covering 96.4% of the corpus; <strong>distilled</strong> from <a href="https://arxiv.org/abs/2412.15115">Qwen2.5-0.5B</a> on <a href="https://arxiv.org/abs/2305.07759">TinyStories</a> — i.e., trained to match the teacher model's output distribution (KL divergence to the teacher's next-token probabilities<sup id="fnref:kl"><a class="footnote-ref" href="#fn:kl">2</a></sup>) plus ordinary cross-entropy on the true next token.</p>
+<p>It took five runs, and the failures are the instructive part:</p>
+<table>
+<thead>
+<tr>
+<th>Run</th>
+<th>Result</th>
+<th>Lesson</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Mirror descent, hot schedule</td>
+<td>oscillates 0.5% ↔ 33%</td>
+<td>multiplicative simplex updates need short, cooled schedules (post 1's lesson, re-learned at LM scale)</td>
+</tr>
+<tr>
+<td>"33% teacher agreement"</td>
+<td><strong>artifact</strong></td>
+<td>the UNK slot had been given the logsumexp of 149k excluded tokens, so the teacher's argmax <em>was</em> UNK a third of the time — both students dutifully learned to say UNK forever<sup id="fnref:unk"><a class="footnote-ref" href="#fn:unk">3</a></sup></td>
+</tr>
+<tr>
+<td>Clean targets, ReLU</td>
+<td>6–10%, rank-28 affine</td>
+<td>the optimizer kills 484/512 units via inhibition overgrowth and keeps a frequency prior — a lazy-linear minimum</td>
+</tr>
+<tr>
+<td>Sigmoid rescue</td>
+<td>17.1%</td>
+<td>sigmoid can't die and auto-normalizes scale — but the lens becomes local-only (next section)</td>
+</tr>
+<tr>
+<td><strong>Hardened ReLU</strong></td>
+<td><strong>32.9%</strong></td>
+<td>concentrated init + inhibition row-sum cap + liveness auxiliary: zero dead units for 14k steps, exact decomposition restored</td>
+</tr>
+</tbody>
+</table>
+<p><img alt="The distillation journey" src="https://doinfinitely.github.io/legible-networks/images/post2/fig_distill.png" /></p>
+<p>Final student: 33.2% teacher agreement@1 (how often its top token matches the teacher's), 25.5% next-token accuracy — a genuinely functional, if modest, TinyStories LM in fully constrained, verifier-legal weights.</p>
+<h2>The lens results</h2>
+<p><strong>Exactness.</strong> For piecewise-linear activations, the exact lens <em>reconstructs the forward pass</em> with max error 3×10⁻⁷. Read that again: the interpretability artifact and the model's computation are the same object — the lens is not a probe of the computation, it <em>is</em> the computation.</p>
+<p>Why does the activation function decide this? A ReLU is piecewise linear: on any <em>single</em> input, each unit is simply open (passes its value through) or shut (outputs zero). Freeze that open/shut pattern and the network from layer <code>l</code> to the output is literally a product of matrices — a linear map. So the Jacobian on that input isn't an approximation of the computation; it <em>equals</em> the computation, gates and all, which is why the lens can rebuild the model's actual outputs to float precision. The price is post 1's trap 1 in new clothing: a ReLU unit that gets driven negative on every input is shut everywhere, receives zero gradient, and is dead <em>permanently</em> — the optimizer killed 484 of 512 units in run 3 exactly this way.</p>
+<p>A sigmoid can't die — its slope is strictly positive everywhere, so every unit always passes some gradient. But a sigmoid is <em>curved</em>, and the Jacobian of a curved function is only the tangent line at the current operating point. The sigmoid student's lens is still the exact per-input Jacobian — strictly more than the fitted method approximates — but it answers a smaller question: "how would the output respond to a <em>small</em> perturbation of <code>h_l</code> right here?" Walk any finite distance along that linear story and the curvature makes it wrong; it cannot rebuild the forward pass. That's the design tension in one line: <strong>ReLU gives exact global decomposition but risks dying during training; sigmoid lives but reads only locally.</strong> The hardened-ReLU recipe (concentrated init, inhibition cap, liveness auxiliary) resolves it: exactness kept, death prevented.</p>
+<p><strong>The headline measurement.</strong> With ground truth computable, we could finally ask a question that is unanswerable in a transformer: how faithful is the Anthropic-style <em>averaged</em> lens to the true per-input transport? ("Transport" here just means the per-input Jacobian <code>J_l(x)</code> — the matrix that carries layer <code>l</code>'s activation to the output frame <em>for that particular input</em>.) The averaged lens replaces every input's transport with one corpus mean, so its fidelity depends entirely on <strong>how much the true transport varies from input to input</strong>. For a ReLU student it varies only <em>discretely</em> — through which gates are open — so a unit whose gate pattern rarely changes across the corpus has an essentially constant transport, and the average is faithful to it. For a sigmoid student the transport varies <em>continuously</em>: the local slope shifts with every input, so the corpus average is an average over many different matrices — a compromise that matches none of them. That's what the middle column below measures, and the right column shows the consequence:</p>
+<table>
+<thead>
+<tr>
+<th>Student</th>
+<th>Input-dependence of true transport</th>
+<th>Averaged-lens top-5 overlap with ground truth</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>sigmoid</td>
+<td>all 1024 units continuously input-dependent</td>
+<td><strong>3.1%</strong></td>
+</tr>
+<tr>
+<td>hardened ReLU</td>
+<td>926/1024 units gating</td>
+<td><strong>91.2%</strong> (worst-case unit: 20%)</td>
+</tr>
+</tbody>
+</table>
+<p>Same architecture family, same task, wildly different fidelity — determined by the model's representational regime. The uncomfortable implication for anyone consuming averaged-lens results on frontier models: you don't know which regime you're in, and the spread between regimes spans "excellent" to "useless." Corpus-averaging is neither uniformly safe nor uniformly lossy; it's model-dependent, and only a substrate with computable ground truth can tell you which regime you're in.</p>
+<h2>Workspace signatures, replayed in a readable substrate</h2>
+<p>The J-lens paper's three workspace signatures, each reproduced here with exact instruments:</p>
+<ul>
+<li><strong>Reportable.</strong> For each prompt, the exact lens produces a <em>disposition score</em> for a chosen concept token — the total bounded path mass currently flowing toward, say, ' Lily' — computed from internal activations alone, before any output token exists, and decomposable into per-unit contributions. To check the score tracks something real, take a battery of prompts and ask the teacher model, for each one, how probable it finds that token next; then correlate <em>across prompts</em>: does the student's internal disposition rise on exactly the prompts where the teacher's log-probability of the concept rises? <a href="https://en.wikipedia.org/wiki/Spearman%27s_rank_correlation_coefficient">Spearman rank correlation</a><sup id="fnref:spearman"><a class="footnote-ref" href="#fn:spearman">4</a></sup>: +0.33 for ' Lily', +0.27 for ' park' — modest, and rising with student quality across runs.</li>
+<li><strong>Controllable.</strong> Every intervention's effect on the disposition is predicted exactly before execution — four decimal places, every test we ran. Steering here is not fitted vectors; it's bookkeeping.</li>
+<li><strong>Causal — the dragon neuron.</strong> A targeted "ownership" loss (maximize each concept token's <em>exclusive-max</em> margin at its best unit) drove concept selectivity from −0.008 to <strong>+0.89 at zero cost in teacher agreement</strong>. Unit 35 now carries ' dragon' with path weight 0.836 (runners-up ≈ 0). Ablate it → p(dragon) = 0. Boost it → p(dragon): 0.0002 → <strong>1.0000</strong>, with the logit change predicted to four decimals (+0.6615 predicted, +0.6615 measured). Generation degenerates on cue from story-babble to "dragon dragon dragon…"</li>
+</ul>
+<p><img alt="The dragon neuron" src="https://doinfinitely.github.io/legible-networks/images/post2/fig_dragon.png" /></p>
+<p>These are <strong>designed, named, precision-steerable concept neurons, created on purpose with a loss term</strong> — not found by sifting, built to spec.</p>
+<p><strong>Does giving a concept a dedicated neuron break its natural readability?</strong> First observation suggested yes: dragon's reportable correlation dropped to ~0 after it gained its unit. The controlled version — twin models, identical except for <em>which</em> three concepts get ownership, every concept measured owned and unowned on a shared 2,048-prompt set — says no. The crossed design gives each of six concepts a matched pair of measurements — its reportability <em>with</em> a dedicated unit and <em>without</em>, everything else identical. Averaged over the six pairs, ownership changed reportability by −0.013 — essentially nothing — and the direction of the change differs concept to concept (some slightly up, some slightly down). So there is no general rule of the form "give a concept its own neuron and it stops being naturally readable." What <em>does</em> survive: dragon specifically dropped again in the twin model, so the original observation was real — and its drop is the largest of the six. But one reliably-dropping concept out of six is a data point, not a law, and dragon happens to be the rarest token of the six, so the drop plausibly tracks <em>rarity</em> rather than ownership per se (a frequency-stratified follow-up is flagged). Practical upshot: ownership engineering is safe to combine with natural readability.<sup id="fnref:prereg"><a class="footnote-ref" href="#fn:prereg">5</a></sup></p>
+<h2>j-carve: cutting task reasoners out of J-space, with certificates</h2>
+<p>Now the door the exact lens opens. If task-relevance is <em>computable</em> — for any verbalized task, the exact lens assigns every edge and unit a bounded path mass toward the task's answer tokens — then pruning everything below threshold should yield a much smaller network that:</p>
+<p><strong>(a)</strong> still performs the task;
+<strong>(b)</strong> still carries a readable J-space — it can report its own answer disposition before producing it (<em>self-reflective</em>); and
+<strong>(c)</strong> comes with a <strong>certified error bound</strong>, because every discarded edge's maximum possible contribution is known in advance — convex rows + bounded inhibition + activations in [0,1] bound all path products.</p>
+<p>Point (c) is the differentiator. Pruning in ordinary networks is empirical: prune, retest, hope. Here the pruning budget is provable arithmetic. And there's a structural bonus: the carved model is renormalized back into the constraint family, so <strong>a carve is itself a legal unit-net</strong> — everything in this series applies recursively to the carved artifact.</p>
+<h3>The pilot</h3>
+<p>Four verbalized tasks, phrased as two-alternative forced choices (2AFC) in TinyStories register (the student has never seen review language, so sentiment becomes "…Overall it was [good/bad]"), each validated against the teacher first. Curves of task accuracy vs fraction of edges kept:</p>
+<p>One knob controls each carve: <code>keep</code>, the fraction of <strong>hidden units and embedding features</strong> retained — the top-<code>keep</code> of each, ranked by exact-lens relevance mass toward the task's answer tokens. Every edge <em>between</em> retained units survives (rows renormalized back to legality); everything else goes. Because each weight matrix shrinks on both sides — rows and columns at once — the parameter count falls roughly as the <em>square</em> of the knob: <code>keep = 0.5</code> leaves ~11% of the weight entries, and <code>keep = 0.1</code> leaves under 1%:</p>
+<table>
+<thead>
+<tr>
+<th>Task</th>
+<th>Teacher</th>
+<th>Student (full, 6.95M entries)</th>
+<th>Carved @ keep = 0.1 (10% of units → 61k entries, 0.9% of dense)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>pos-slot (verb/noun)</td>
+<td>1.00</td>
+<td><strong>1.00</strong></td>
+<td><strong>1.00</strong> — a 114× reduction</td>
+</tr>
+<tr>
+<td>sentiment</td>
+<td>0.92</td>
+<td>0.50 (chance)</td>
+<td>capacity-gated</td>
+</tr>
+<tr>
+<td>topic</td>
+<td>1.00</td>
+<td>0.33 (chance)</td>
+<td>capacity-gated</td>
+</tr>
+<tr>
+<td>pronoun gender</td>
+<td>1.00</td>
+<td>0.50 (chance)</td>
+<td>capacity-gated</td>
+</tr>
+</tbody>
+</table>
+<p><img alt="Carving curves" src="https://doinfinitely.github.io/legible-networks/images/post2/fig_carve.png" /></p>
+<p>The part-of-speech reasoner holds <strong>exactly 1.00 from the full 6.95M-entry student down to a carve retaining just 10% of its units</strong> — 61k weight entries, a 114× reduction — collapsing to chance at the next notch (5% of units, 22k entries): a sharp carving cliff, not a slope. The other three tasks sit at chance <em>in the full student</em>: a capacity boundary, precisely drawn by the teacher reference — there's nothing to carve yet, and every point of future student quality unlocks more of the ladder. Each curve point also carries its certified |Δz| bound — in the pilot, computed by charging every dropped unit its maximum possible output-path mass, a one-line piece of arithmetic that the geometry makes valid (activations are bounded by 1, so a dropped unit's worst case is simply its output weights' absolute mass toward the task tokens). At aggressive budgets that bound is honest but loose — measured behavior sits far inside it — and the next section identifies precisely the term it fails to charge.</p>
+<h3>How carving actually works — and how the textbook method collapses</h3>
+<p>Between the pilot and this post, we ran the carving-dynamics study on an independent testbed: a from-scratch unit-net character LM (4 layers, ~2.17M weight entries, four-domain corpus), carved at fixed budgets of 10% / 3% / 1% / 0.3% of dense, scored by top-1 agreement with the dense net on a held-out battery. Five findings, and the first is the shocker:</p>
+<p><strong>1. Naive relevance scoring doesn't underperform — it collapses below random.</strong> First-order Taylor edge saliency — expected |weight × input activation × output gradient|, the textbook-correct importance score — scored <strong>0.03 agreement at a 10% budget, below random carving (0.04)</strong>, while plain global magnitude pruning — the crudest baseline there is: rank every weight entry in the whole network by absolute size, keep the top-k, delete everything else, with no notion of task, row, or position — scored 0.67.</p>
+<p>The mechanism is specific to the geometry: carving is not deletion, it is deletion <strong>plus forced renormalization</strong> of every surviving P row (the carve must stay a legal unit-net, so each surviving row's entries are rescaled to re-sum to 1). Any global score with row-level multipliers concentrates the shared edge budget on a few "hot" rows, and the other rows get <em>starved</em> — allocated almost nothing, in the limit keeping only the one entry that legality forces every row to retain. And here's the trap: a one-entry P row renormalizes that lone entry to weight <strong>1.0</strong>. A unit that spent training averaging hundreds of inputs at ~0.01 each becomes a full-strength wire copying one arbitrary input; its activation jumps ~50× above anything it produced during training, and the dense-trained downstream weights faithfully amplify the garbage. <strong>Starved rows are toxic, not merely lossy</strong> — they don't fall silent, they <em>scream</em> — hence a cliff to below-random rather than graceful degradation.</p>
+<!--WIDGET:renorm_spike-->
+<blockquote>
+<p>🕹️ <strong>Interactive Figure 4 — <a href="https://doinfinitely.github.io/legible-networks/widgets/renorm_spike.html">The renorm spike</a>.</strong> Top: one neuron's budget bar (the motif from Figure 1). Drag the "edges kept" slider down and watch the survivors inflate to keep the bar at 1.0 — at one surviving edge, that synapse <em>is</em> the neuron, and the readout shows its activation on a fixed input jumping ~50× above trained scale. Bottom: four rows sharing one edge budget, allocated either by a global sort (the textbook way — one hot row hoards, three rows starve and spike) or balanced per row (renorm factors stay near 1). Same budget, same scores, opposite outcomes.</p>
+</blockquote>
+<p><strong>2. Magnitude pruning survives by accident, then dies.</strong> Because every row sums to 1, entry magnitudes are on a comparable scale across rows, so a global magnitude sort <em>accidentally</em> spreads budget evenly and each row keeps its own head — renorm factors stay near 1. That grace runs out as budgets thin: 0.67 @ 10% → 0.43 @ 3% → 0.07 @ 1% → 0.04 @ 0.3%. (A subtler variant of the same failure: a globally-scored pool starved an <em>entire layer</em> — allocation must be balanced per row, water-filling style, never trusted to a global sort.)</p>
+<p><strong>3. The unit of selection is the subgraph, not the edge.</strong> What works: decide which <em>units</em> stay alive per layer (ranked by activation × backpropped influence toward the answer), then spend the whole edge budget inside the live subnetwork, balanced across live rows. Dead units still legally require one P-row entry each — and the trick is <em>where to park it</em>: on the constant-1 bias feature (post 1's only bias mechanism, an always-on input appended to every layer). A dead unit then outputs a harmless constant rather than a ×50 amplified copy of whichever input its forced entry happened to land on. And — the load-bearing detail — live rows retain edges <strong>only into live units</strong>, so even that constant has no path into the computation. Deletion damage becomes <em>containment</em>.</p>
+<p><strong>4. Selection alone still computes the wrong function; values must be repaired under the constraints.</strong> Call the <em>support</em> the carve's sparsity pattern — <em>which</em> edges and units are retained — as distinct from the <em>values</em> those retained weights carry. Even a well-chosen support scored ≈0.00 at the 0.3% budget before repair: renormalization rescales every surviving row and removed inhibition shifts every threshold — the wiring is right but the arithmetic is wrong. Projected SGD on the retained values toward the dense net's outputs — every step re-clips N to [0,1] and renormalizes each P row over its retained support, so <strong>legality is preserved by construction</strong> — takes that dead 0.3% carve to <strong>0.56</strong>. Repair is cheap (milliseconds per step on CPU at this scale).</p>
+<p><strong>5. Repair cannot rescue an incoherent support.</strong> Same repair, different supports, at 0.3%: live-subgraph selection → <strong>0.58</strong>; global magnitude → 0.25; random → 0.07. A magnitude-chosen edge set is scattered dust — high-weight edges whose endpoints don't compose into input→output paths — and no value optimization pushes signal through paths that don't exist. <strong>Support quality is the real currency; repair only cashes it.</strong></p>
+<p>The full table (held-out agreement with the dense net):</p>
+<table>
+<thead>
+<tr>
+<th>method</th>
+<th>10%</th>
+<th>3%</th>
+<th>1%</th>
+<th>0.3%</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>random + renorm</td>
+<td>0.04</td>
+<td>0.03</td>
+<td>0.02</td>
+<td>0.02</td>
+</tr>
+<tr>
+<td>Taylor edge saliency + renorm</td>
+<td>0.03</td>
+<td>0.02</td>
+<td>0.01</td>
+<td>0.01</td>
+</tr>
+<tr>
+<td>global magnitude + renorm</td>
+<td>0.67</td>
+<td>0.43</td>
+<td>0.07</td>
+<td>0.04</td>
+</tr>
+<tr>
+<td>subgraph (selection only)</td>
+<td>0.74</td>
+<td>0.53</td>
+<td>0.16</td>
+<td>~0.00</td>
+</tr>
+<tr>
+<td><strong>subgraph + repair</strong></td>
+<td><strong>0.72</strong></td>
+<td><strong>0.73</strong></td>
+<td><strong>0.65</strong></td>
+<td><strong>0.56</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Two consequences for the certification story. First, <strong>the certified bound must charge the renormalization term</strong>: for a row with kept excitatory mass <code>m</code>, the surviving terms are rescaled by <code>1/m</code>, so the error decomposes as</p>
+<blockquote>
+<p><code>z′ − z = (1/m − 1)·Σ_kept p·a − Σ_dropped p·a + Σ_dropped n·a</code></p>
+</blockquote>
+<p>and the <code>(1/m − 1)</code> term — bounded and computable from the same geometry, since activations live in [0,1] — is the <em>dominant</em> error source that a discarded-mass-only bound silently misses. That's precisely why the pilot's bounds are loose, and why "prune everything below threshold" produces spikes the naive bound calls safe. Second, the pipeline is <strong>carve → repair → re-certify</strong>: repair preserves legality at every step, so the certified bound recomputes cleanly on the repaired net. And a diagnostic worth exporting to any pruning work in constrained geometries: <strong>expect a cliff, not a knee</strong>, wherever a method lacks either containment or repair.</p>
+<p>A note on where the geometry itself is heading, because these findings drove a design change. A later revision of the constraint family relaxes "every P row sums to <em>exactly</em> 1" to "<em>at most</em> 1" — implemented by letting dropped mass park on a constant-<strong>zero</strong> column, the do-nothing sibling of the bias feature (a slack unit whose value is always 0, so budget spent on it contributes nothing). Under that convention a carve never renormalizes survivors upward at all: removed mass simply becomes dead budget, the <code>(1/m − 1)</code> term vanishes from the error decomposition <em>by construction</em>, and the renorm spike becomes impossible rather than merely contained. Readers who continue to post 3 will recognize this as the same lesson the transplant work learned independently as its "never inflate" rule. The findings above are what taught us the relaxation was worth making.</p>
+<h3>The task ladder, and the compositionality meter</h3>
+<p>The pilot's four tasks are the bottom of a designed 12-task ladder in three tiers: Tier 1 lexical (sentiment — where negation is <em>literally</em> an inhibitory N-path flipping a positive valence path, making the classic hardest part of lexicon sentiment a first-class visible object — plus register ID, keyword detection, topic); Tier 2 local syntax (POS, NER, chunking, word-sense disambiguation — the purest test of ReLU gating as a carving boundary: same word, two J-spaces, gate decides); Tier 3 compositional stress tests (entailment, coreference, and <strong>Winograd schemas as the designed negative control</strong>).</p>
+<p>The Winograd tier is the part we'd most like LW readers to sit with. Winograd resolution turns on world knowledge ("the trophy doesn't fit in the suitcase because <em>it</em> is too big"), which by construction cannot live in a small lexical subgraph. The prediction is that carving <em>fails</em> to shrink the network much at matched accuracy — <strong>and that failure is the measurement</strong>: the fraction of J-space a task refuses to release quantifies its compositionality. (By <em>compositionality</em> we mean the degree to which a task's answer depends on relations <em>among</em> several pieces of information — how they combine — rather than on the independent presence of particular tokens or features. "Good/bad after 'not'" is barely compositional: one flip, visible as one N-path. Winograd is maximally so: every lexical cue is identical between the two readings, and only the combination decides.) A compositionality meter built from pruning curves, with the network's own geometry sorting tasks by how much "reasoner" they actually require.<sup id="fnref:taskport"><a class="footnote-ref" href="#fn:taskport">6</a></sup></p>
+<h2>Where this left us</h2>
+<p>Two conclusions stood at the end of this phase. First, the J-space of a unit-net is exact where a transformer's must be approximated — and the approximation's fidelity is <em>regime-dependent</em> (3% vs 91%) in a way only a readable substrate can measure. Second, all three workspace phenomena reproduce at 3M parameters with interventions that are arithmetic, and the same arithmetic supports certified extraction of task reasoners — once you respect the renormalization dynamics that make naive pruning toxic.</p>
+<p>The obvious objection: <em>this is a 33%-agreement toy distilled onto TinyStories; nobody cares about legible toys.</em> We agreed. Which is why the next session abandoned distillation entirely and asked whether you can take a <strong>pretrained, full-strength network and make it a unit-net in place, exactly, without a single gradient step</strong>. The answer — 97.7% of Qwen's foldable mass, 95.5% of ResNet18, and eventually 99.97% of KataGo — is post 3.</p>
+<hr />
+<h2>Addendum: j-carve on the transplanted Qwen (added 2026-07-26)</h2>
+<p>The pilot above ran against the 33%-agreement distilled student, and three of its four tasks were capacity-gated — chance <em>with the full model</em>, nothing to carve. That gate is now gone: the student is the pretrained model itself, moved exactly into the legal family by post 3's transplant machinery (argmax agreement 1.0000 with the original; 70.8% of layer-linear weights — the transformer's linear matrices, the carveable substrate — unit-net-legal). Full-model held-out accuracy: sentiment 0.80, topic 1.00, pronoun 1.00, pos-slot 1.00. Every prediction the pilot could only gesture at got tested. Highlights:</p>
+<p><strong>The renorm spike came back wearing RMSNorm.</strong> Under the ≤1 relaxation there is no row renormalization left to spike — removal only <em>lowers</em> positive row sums, and the carve is legal by construction. The first run degraded anyway: zeroing a dropped channel shrinks the residual stream, and every RMSNorm <em>reader</em> re-inflates the survivors — the same non-local poisoning, one door down (gentler: degradation, not below-random collapse). The fix is the replacement ladder's first rung from post 3: <strong>replace each dropped channel with its fit-battery mean</strong>, folded into a bias — a non-budget constant with the same epistemic status as a BatchNorm β. Relevance scoring must then be <em>centered</em> (a channel that never varies is replaced exactly by its mean, so only its variation can matter). Effect at an 11%-params carve: pronoun 0.58 → 0.92. Finding 4's moral — selection alone computes the wrong function — solved this time by folding rather than training.</p>
+<p><strong>The headline: task/LM separation and the stratification law, on a real 0.5B transformer.</strong> Held-out accuracy vs fraction of layer-linear parameters kept (units of selection: MLP channels and attention heads, per finding 3):</p>
+<table>
+<thead>
+<tr>
+<th>task</th>
+<th>100%</th>
+<th>50%</th>
+<th>21%</th>
+<th>11%</th>
+<th>6.5%</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>pos-slot (syntax)</td>
+<td>1.00</td>
+<td>1.00</td>
+<td>1.00</td>
+<td>1.00</td>
+<td><strong>0.92</strong></td>
+</tr>
+<tr>
+<td>pronoun gender</td>
+<td>1.00</td>
+<td>0.96</td>
+<td>1.00</td>
+<td><strong>0.85</strong></td>
+<td>0.50</td>
+</tr>
+<tr>
+<td>sentiment</td>
+<td>0.80</td>
+<td><strong>0.90</strong></td>
+<td>0.65</td>
+<td>0.60</td>
+<td>0.45</td>
+</tr>
+<tr>
+<td>topic</td>
+<td>1.00</td>
+<td><strong>0.92</strong></td>
+<td>0.58</td>
+<td>dies</td>
+<td>—</td>
+</tr>
+<tr>
+<td><em>teacher agreement (general text)</em></td>
+<td>1.00</td>
+<td>~0.1</td>
+<td>0.00</td>
+<td>0.00</td>
+<td>0.00</td>
+</tr>
+</tbody>
+</table>
+<p>Read the bottom row against the others: at half the parameters, every task sits at or above its full-model accuracy while general next-token agreement is nearly zero. <strong>The carve extracts the reasoner and discards the language model around it</strong> — the pilot's thesis, now demonstrated where it matters. And the stratification is post 3's highways finding, confirmed with each task <em>aimed at</em> rather than hit by accident: syntax survives to 6.5%, pronoun to 11%, the semantic tasks fall apart below half. (The pronoun-carved model still does pos-slot at 0.75 while everything it <em>wasn't</em> carved for sits at chance — the gender circuit rides the syntax trunk.)</p>
+<p><img alt="Carving the transplanted Qwen" src="https://doinfinitely.github.io/legible-networks/images/post2/fig_carve_qwen.png" /></p>
+<p><strong>The compositionality meter reads — one tier early, and inside a single task.</strong> Splitting sentiment into <strong>sent-lex</strong> (a valence word is present; echo it, flip it under negation) and <strong>sent-inf</strong> (event → valence inference, zero affect vocabulary: "The bridge project ran two years late…" → <em>bad</em>) separates cleanly: sent-lex carves like the syntax tasks (0.83 at 11% params); sent-inf is hard for the <em>full</em> model (0.67) and refuses to compress. What the meter measures is not the task's name but how much world-inference its probes demand — exactly the Winograd-tier prediction, arriving a tier early because the probes moved up-register with the student.</p>
+<p><strong>Budget shape is a per-task property.</strong> Topic's early death turned out to be <em>attention starvation</em>: heads are few, cheap (~12% of layer-linear params all kept), and load-bearing for routing "this passage" to "its topic word." Keeping heads at √f while MLP channels take the full cut revives topic from dead to 0.67 at 14% params — while pos-slot alone prefers the symmetric carve (its circuit is MLP-cheap). MLP channels and attention heads should never share one knob.</p>
+<p><strong>Repair replicates — and hits a new wall.</strong> Legality-projected value repair (Adam on kept entries only, no-inflate projection every step — post-repair census confirms legality is free) reproduces findings 4 and 5 exactly at 0.5B: a coherent support is rescued (pos-slot at a 2% carve: 0.58 → 0.83 held-out), an incoherent one is beyond help (pronoun at 5%: the name→gender signal simply isn't in the support). The new failure mode is <strong>data starvation</strong>: batteries of 12–48 probes overfit within a few hundred steps (topic repairs to 1.00 on the fit battery while held-out stays at prior-chance — the support memorizes routes). Repair needs a fitting battery an order of magnitude larger than selection does.</p>
+<p><strong>The honest negative, and the door it opens.</strong> The pilot's certified bound did <em>not</em> transfer: transformer activations aren't confined to [0,1], the frozen linearization is first-order once gates and attention patterns shift, and the computed bounds — while rank-ordering task fragility correctly — are vacuous as certificates (hundreds of logits against O(1) margins). But the transplant supplies the repair path: RMSNorm's output is <em>architecturally</em> bounded (|x̂_c| ≤ √d·|γ_c| for every input), legal rows turn bounded inputs into bounded outputs by weight arithmetic alone, softmax is a convex combination and RoPE a rotation — both interval-safe — so carving deltas can be propagated as sound intervals end to end. The transplant law didn't just move the weights into the legal family; <strong>it made the certificate computable.</strong> Building that chain is the next concrete step, along with composing carve → temperature fold → integer quantization on the survivor.</p>
+<hr />
+<div class="footnote">
+<hr />
+<ol>
+<li id="fn:jlens">
+<p><em>Verbalizable Representations Form a Global Workspace in Language Models</em>, Anthropic, July 2026; code at <code>anthropics/jacobian-lens</code>. Our experiments use the same Qwen family as that paper's examples so the comparison machinery runs unmodified.&#160;<a class="footnote-backref" href="#fnref:jlens" title="Jump back to footnote 1 in the text">&#8617;</a></p>
+</li>
+<li id="fn:kl">
+<p>KL divergence — the standard asymmetric measure of how much one probability distribution diverges from another; minimizing KL(teacher ‖ student) over next-token distributions is the classic distillation loss. The logit-scale trick from post 1 (trap 3) carries over unchanged: convex rows compress logit spread at LM scale too.&#160;<a class="footnote-backref" href="#fnref:kl" title="Jump back to footnote 2 in the text">&#8617;</a></p>
+</li>
+<li id="fn:unk">
+<p>We keep this failure in the writeup because it's the platonic form of an evaluation bug: two <em>independent</em> training methods "agreeing" at 33% looked like convergent validity and was actually both students converging on the same corrupted target. If two very different methods agree suspiciously well, check the target before celebrating.&#160;<a class="footnote-backref" href="#fnref:unk" title="Jump back to footnote 3 in the text">&#8617;</a></p>
+</li>
+<li id="fn:spearman">
+<p>Pearson correlation computed on ranks — it measures whether the <em>orderings</em> agree, robust to any monotone rescaling. The right choice here, since disposition scores and teacher log-probs live on unrelated scales.&#160;<a class="footnote-backref" href="#fnref:spearman" title="Jump back to footnote 4 in the text">&#8617;</a></p>
+</li>
+<li id="fn:prereg">
+<p>In hindsight this mini-arc — striking single observation, then a crossed twin-model design that kills the general claim while preserving the original data point — is the pattern we'd recommend to anyone doing interpretability with N=1 models. It recurs, at much higher stakes, in post 6 — where the corrected result goes against us.&#160;<a class="footnote-backref" href="#fnref:prereg" title="Jump back to footnote 5 in the text">&#8617;</a></p>
+</li>
+<li id="fn:taskport">
+<p>One byproduct worth a footnote: the pos-slot carving problem was ported into a self-contained benchmark task (frozen student weights, pre-encoded probes, oracle solution, structural asserts) whose deliberately laziest wrong answers are exactly the methods the dynamics memo convicts — global magnitude and activation-magnitude selection. If you want to feel the renorm spike yourself, it's a good afternoon.&#160;<a class="footnote-backref" href="#fnref:taskport" title="Jump back to footnote 6 in the text">&#8617;</a></p>
+</li>
+</ol>
+</div>
