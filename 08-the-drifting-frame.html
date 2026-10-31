@@ -29,7 +29,11 @@ hr{border:none;border-top:1px solid #CFCCC0}
 .series-nav.bottom{display:flex;justify-content:space-between;gap:12px;border-top:1px solid #CFCCC0;padding-top:14px;margin-top:40px}
 .series-nav .nav-next{text-align:right}
 .series-nav .nav-prev,.series-nav .nav-next{max-width:44%}
-</style></head><body><main><nav class="series-nav top"><span><a href="index.html">Legible Networks</a></span><span>Post 8 of 8</span></nav>
+.tldr{background:#F1EFE7;border-left:3px solid #2E7D4F;padding:14px 18px 12px;margin:0 0 26px}
+.tldr-label{font-weight:bold;font-size:15px;letter-spacing:.04em;color:#2E7D4F;margin:0 0 6px}
+.tldr ul{margin:0;padding-left:1.25em}
+.tldr li{margin:5px 0;font-size:15.5px;line-height:1.5}
+</style></head><body><main><nav class="series-nav top"><span><a href="index.html">Legible Networks</a></span><span>Post 8 of 8</span></nav><section class="tldr"><p class="tldr-label">TL;DR</p><ul><li>Exact attribution, run to the end of its rope: signed path mass cancels to <strong>exactly zero</strong> past ~5 convolutions (|net|/gross 0.121 one hop below the tip &rarr; 0.000 by five), replicated across two architectures to the third decimal. No static path algebra carries information at depth.</li><li>What happens instead: information <em>persists</em> while the encoding frame <em>rotates</em> ~45&deg; per block &mdash; one unsupervised linear alignment restores probe transfer to 96&ndash;99% of ceiling in both a conv-ResNet and a transformer.</li><li>The per-position work rides in deviations from mean transport: deleting one block's deviation costs &minus;237 Elo; rotating the <em>entire state</em> 45&deg; costs &asymp; nothing. The frame is slack; the deviation is load-bearing.</li><li><strong>The program atlas:</strong> a position's activation state is the address of the program it runs (state cosine predicts operator distance at Spearman &minus;0.88). 154 endgame material classes collapse to six programs organized by verdict, not material; the map survives a &minus;237-Elo lobotomy and replicates across independent training runs.</li><li>General law: cluster geometry tracks how settled the training objective's answer is &mdash; discrete programs where it's decided, continuum where it's genuinely open.</li></ul></section>
 <p style="font-family:ui-monospace,Menlo,monospace;font-size:11px;letter-spacing:.15em;color:#2B4C7E">
 PREVIEW BUILD · IMAGES + INTERACTIVE FIGURES EMBEDDED · NOT THE LW SOURCE</p>
 <h1>The Drifting Frame and the Program Atlas: What Deep Computation Actually Is</h1>

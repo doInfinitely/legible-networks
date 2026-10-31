@@ -29,7 +29,11 @@ hr{border:none;border-top:1px solid #CFCCC0}
 .series-nav.bottom{display:flex;justify-content:space-between;gap:12px;border-top:1px solid #CFCCC0;padding-top:14px;margin-top:40px}
 .series-nav .nav-next{text-align:right}
 .series-nav .nav-prev,.series-nav .nav-next{max-width:44%}
-</style></head><body><main><nav class="series-nav top"><span><a href="index.html">Legible Networks</a></span><span>Post 4 of 8</span></nav>
+.tldr{background:#F1EFE7;border-left:3px solid #2E7D4F;padding:14px 18px 12px;margin:0 0 26px}
+.tldr-label{font-weight:bold;font-size:15px;letter-spacing:.04em;color:#2E7D4F;margin:0 0 6px}
+.tldr ul{margin:0;padding-left:1.25em}
+.tldr li{margin:5px 0;font-size:15.5px;line-height:1.5}
+</style></head><body><main><nav class="series-nav top"><span><a href="index.html">Legible Networks</a></span><span>Post 4 of 8</span></nav><section class="tldr"><p class="tldr-label">TL;DR</p><ul><li>KataGo's famous cyclic exploit, traced end to end: <strong>nothing is fooled &mdash; something was never learned</strong>.</li><li>The policy has an urgency horizon: above ~3 ring liberties it proposes nothing on the race, so search (which only expands policy proposals) starves; the network reads dead groups as alive in 18/20 evaluations, most confidently on exploit-like boards.</li><li>Its race rule was extracted as a 19-state automaton via Angluin's L* (held-out agreement 1.0000, 28 forward passes); the verdict is carried by one additive direction smeared over ~a whole layer, not by any channel.</li><li>The absence is certified with a matched control: no linear readout decodes settled life/death truth (0.50 vs 0.62 majority baseline) while eye-<em>presence</em> decodes 26/26 from the same features &mdash; the network never composed “two eyes &rArr; alive.”</li><li>Replicated across ~30&times; parameters; the largest net's race rule is <em>more</em> optimistic.</li></ul></section>
 <p style="font-family:ui-monospace,Menlo,monospace;font-size:11px;letter-spacing:.15em;color:#2B4C7E">
 PREVIEW BUILD · IMAGES + INTERACTIVE FIGURES EMBEDDED · NOT THE LW SOURCE</p>
 <h1>Anatomy of a Blind Spot: KataGo's Cyclic Vulnerability, End to End</h1>

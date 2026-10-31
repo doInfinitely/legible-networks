@@ -29,7 +29,11 @@ hr{border:none;border-top:1px solid #CFCCC0}
 .series-nav.bottom{display:flex;justify-content:space-between;gap:12px;border-top:1px solid #CFCCC0;padding-top:14px;margin-top:40px}
 .series-nav .nav-next{text-align:right}
 .series-nav .nav-prev,.series-nav .nav-next{max-width:44%}
-</style></head><body><main><nav class="series-nav top"><span><a href="index.html">Legible Networks</a></span><span>Post 5 of 8</span></nav>
+.tldr{background:#F1EFE7;border-left:3px solid #2E7D4F;padding:14px 18px 12px;margin:0 0 26px}
+.tldr-label{font-weight:bold;font-size:15px;letter-spacing:.04em;color:#2E7D4F;margin:0 0 6px}
+.tldr ul{margin:0;padding-left:1.25em}
+.tldr li{margin:5px 0;font-size:15.5px;line-height:1.5}
+</style></head><body><main><nav class="series-nav top"><span><a href="index.html">Legible Networks</a></span><span>Post 5 of 8</span></nav><section class="tldr"><p class="tldr-label">TL;DR</p><ul><li>The (transplanted) Qwen carries a genuine soft <strong>stack</strong> of owed closers in its residual stream &mdash; slot-addressable, pop-surviving, causally writable, read by its own downstream layers (top-of-stack decodes at 0.965 even just after a pop).</li><li>Its <em>behavior</em> reads a cheaper structure: an unordered <strong>bag</strong>. On conflict prefixes (stack top &ne; bag majority) accuracy is exact chance at every depth.</li><li>One fitted equation (bag coefficient 6&times; the truth's) retrodicts seven separate measurements, including the steering nulls.</li><li>~100k tokens of targeted finetuning wires a reader onto the <em>pre-identified</em> direction: conflict accuracy 0.49 &rarr; 0.93, and a pre-registered steering null becomes 0.997 control.</li><li>A complete, causally-verified ELK instance: the model knew; it didn't consult. Behavioral evals conflate the two.</li></ul></section>
 <p style="font-family:ui-monospace,Menlo,monospace;font-size:11px;letter-spacing:.15em;color:#2B4C7E">
 PREVIEW BUILD · IMAGES + INTERACTIVE FIGURES EMBEDDED · NOT THE LW SOURCE</p>
 <h1>The Stack the Model Never Read</h1>

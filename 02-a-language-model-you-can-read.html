@@ -29,7 +29,11 @@ hr{border:none;border-top:1px solid #CFCCC0}
 .series-nav.bottom{display:flex;justify-content:space-between;gap:12px;border-top:1px solid #CFCCC0;padding-top:14px;margin-top:40px}
 .series-nav .nav-next{text-align:right}
 .series-nav .nav-prev,.series-nav .nav-next{max-width:44%}
-</style></head><body><main><nav class="series-nav top"><span><a href="index.html">Legible Networks</a></span><span>Post 2 of 8</span></nav>
+.tldr{background:#F1EFE7;border-left:3px solid #2E7D4F;padding:14px 18px 12px;margin:0 0 26px}
+.tldr-label{font-weight:bold;font-size:15px;letter-spacing:.04em;color:#2E7D4F;margin:0 0 6px}
+.tldr ul{margin:0;padding-left:1.25em}
+.tldr li{margin:5px 0;font-size:15.5px;line-height:1.5}
+</style></head><body><main><nav class="series-nav top"><span><a href="index.html">Legible Networks</a></span><span>Post 2 of 8</span></nav><section class="tldr"><p class="tldr-label">TL;DR</p><ul><li>A TinyStories LM distilled into the geometry has an <strong>exact</strong> per-input lens: it reconstructs the model's own forward pass to max error 3&times;10&supmin;&#8311; &mdash; the lens <em>is</em> the computation, not a probe of it.</li><li>Measured against that ground truth, a corpus-averaged (Anthropic-style) lens is regime-dependent: 91.2% top-5 fidelity on a ReLU student vs 3.1% on a sigmoid one. You don't know which regime a frontier model is in.</li><li>Concept neurons can be <em>designed</em> with a loss term: the dragon neuron's interventions are predicted to four decimal places (ablate &rarr; p(dragon)=0; boost &rarr; 1.0000).</li><li><strong>j-carve</strong> prunes by exact path relevance to cut task reasoners out with certificates; textbook Taylor saliency doesn't just underperform here, it collapses <em>below random</em> (the renorm spike).</li><li>On the transplanted Qwen: at 50% of parameters every probed task holds at or above full-model accuracy while general next-token agreement drops to ~0 &mdash; the carve extracts the reasoner and discards the language model around it.</li></ul></section>
 <p style="font-family:ui-monospace,Menlo,monospace;font-size:11px;letter-spacing:.15em;color:#2B4C7E">
 PREVIEW BUILD · IMAGES + INTERACTIVE FIGURES EMBEDDED · NOT THE LW SOURCE</p>
 <h1>A Language Model You Can Read With Arithmetic</h1>

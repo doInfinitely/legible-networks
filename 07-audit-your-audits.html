@@ -29,7 +29,11 @@ hr{border:none;border-top:1px solid #CFCCC0}
 .series-nav.bottom{display:flex;justify-content:space-between;gap:12px;border-top:1px solid #CFCCC0;padding-top:14px;margin-top:40px}
 .series-nav .nav-next{text-align:right}
 .series-nav .nav-prev,.series-nav .nav-next{max-width:44%}
-</style></head><body><main><nav class="series-nav top"><span><a href="index.html">Legible Networks</a></span><span>Post 7 of 8</span></nav>
+.tldr{background:#F1EFE7;border-left:3px solid #2E7D4F;padding:14px 18px 12px;margin:0 0 26px}
+.tldr-label{font-weight:bold;font-size:15px;letter-spacing:.04em;color:#2E7D4F;margin:0 0 6px}
+.tldr ul{margin:0;padding-left:1.25em}
+.tldr li{margin:5px 0;font-size:15.5px;line-height:1.5}
+</style></head><body><main><nav class="series-nav top"><span><a href="index.html">Legible Networks</a></span><span>Post 7 of 8</span></nav><section class="tldr"><p class="tldr-label">TL;DR</p><ul><li><strong>The Baseline Law:</strong> audited against random play, chess/Go/LM policies show 1,079 / 804 / ~8,300 significant “drive” features; against competent baselines (human masters, real text) that collapses to 23 / 16 &mdash; a ~50&times; deflation. Random baselines measure competence, not character (profile correlation +0.98 with any strong player).</li><li>The chess policy's one surviving trait: it castles in 0.0% of continuations where human masters castle in 22% &mdash; and its own value head ranks the castle #1 in 43% of those positions. Pure prior starvation, budget-curable by search (0.2% &rarr; 17.6% across 25&ndash;800 simulations).</li><li><strong>The Grounding Law:</strong> search moderates a policy's drives iff its value signal is anchored outside the policy (chess &minus;0.27, Go &minus;0.21); self-scored beam search rewrites 65% of tokens yet moves 0 of 22,400 drive features &mdash; replicated at four scales to 7B.</li><li>Four of our own headline findings died by their own kill-tests on the way; the two laws are what survived.</li></ul></section>
 <p style="font-family:ui-monospace,Menlo,monospace;font-size:11px;letter-spacing:.15em;color:#2B4C7E">
 PREVIEW BUILD · IMAGES + INTERACTIVE FIGURES EMBEDDED · NOT THE LW SOURCE</p>
 <h1>Audit Your Audits: The Baseline Law and the Grounding Law</h1>

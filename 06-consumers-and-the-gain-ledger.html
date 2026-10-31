@@ -29,7 +29,11 @@ hr{border:none;border-top:1px solid #CFCCC0}
 .series-nav.bottom{display:flex;justify-content:space-between;gap:12px;border-top:1px solid #CFCCC0;padding-top:14px;margin-top:40px}
 .series-nav .nav-next{text-align:right}
 .series-nav .nav-prev,.series-nav .nav-next{max-width:44%}
-</style></head><body><main><nav class="series-nav top"><span><a href="index.html">Legible Networks</a></span><span>Post 6 of 8</span></nav>
+.tldr{background:#F1EFE7;border-left:3px solid #2E7D4F;padding:14px 18px 12px;margin:0 0 26px}
+.tldr-label{font-weight:bold;font-size:15px;letter-spacing:.04em;color:#2E7D4F;margin:0 0 6px}
+.tldr ul{margin:0;padding-left:1.25em}
+.tldr li{margin:5px 0;font-size:15.5px;line-height:1.5}
+</style></head><body><main><nav class="series-nav top"><span><a href="index.html">Legible Networks</a></span><span>Post 6 of 8</span></nav><section class="tldr"><p class="tldr-label">TL;DR</p><ul><li>Given a verified-but-apparently-unread safety feature in KataGo, we tried to build it a reader: finetuning builds <em>a</em> consumer but routed around our axis; a 129-parameter graft surfaces the trunk's dissenting (more correct) opinion about the exploit groups but can't sustain a 20-move campaign; search can't help because policy, self-play teacher, and value head share the blindness &mdash; <strong>defended in depth</strong>.</li><li>The composition &mdash; graft as trainable initialization + externally-grounded labels &mdash; is the one that works: behavior fixed, generality intact, closure test positive (97% of chains respond correctly).</li><li>Then we put our own nulls on trial with a stricter protocol &mdash; and convicted both: the Dyck counter and the safety axis <em>are</em> natively read; the founding steering nulls were instrument failure (synthetic vector writes fail their own validity gates).</li><li>The corrected law: consumers have per-feature, per-context <strong>gain</strong>. Blind spots are zeros in a learned gain schedule &mdash; invisible to on-distribution behavioral evals by construction, and exactly what an adversary needs to find.</li><li>Training tunes gains, essentially never directions: pointing buys reliability and ownership, not possibility.</li></ul></section>
 <p style="font-family:ui-monospace,Menlo,monospace;font-size:11px;letter-spacing:.15em;color:#2B4C7E">
 PREVIEW BUILD · IMAGES + INTERACTIVE FIGURES EMBEDDED · NOT THE LW SOURCE</p>
 <h1>Consumers, Not Representations — and How We Convicted Our Own Nulls</h1>
