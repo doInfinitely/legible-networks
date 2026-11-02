@@ -76,7 +76,7 @@ th{background:#F1EFE7}
 <p><strong>Encoding finding from G0.</strong> At the 3 decimals used in Exp. 1, 26-30% of transplanted W1 weights round to zero (0.3-0.4% raw) and agreement falls to 0.96-0.98 (raw: ≥ 0.999). Any text-format comparison therefore has to match precision by significant figures and report token counts. Exp. 7 is unaffected because the reader loads tensors from files.</p>
 <h2>Shared setup</h2>
 <p><strong>Pairs.</strong> 20 new honest/sycophant pairs built with their released <code>dataset/</code> and <code>code/</code>, new seeds, numbered in advance. Their three original pairs are excluded because their outcomes are public. Both stages use the same pairs, each in a fresh conversation in each arm.</p>
-<p><strong>Reader.</strong> <code>[REMY: confirm gpt-6-astra access; effort xhigh]</code>. If the reader changes, predictions are restated before freezing.</p>
+<p><strong>Reader.</strong> <code>gpt-6-astra</code> through the Codex CLI at effort xhigh, as in their runs. Account access is still to be confirmed. If the reader changes, predictions are restated before freezing.</p>
 <p><strong>Blinding.</strong> All tensors in every arm are stored as float32, so the file format reveals nothing. A and B are assigned by seeded coin flip per pair per arm, and the key is read only by the scoring script. Neither Remy nor Claude views transcripts before scoring.</p>
 <p><strong>Early stop.</strong> In each stage, run pairs 1-6 first. If the transplanted arm reaches ≤ 3/6 on that stage's primary count, stop that stage and report. This can only stop for failure, so it does not inflate the false-positive rate. A Stage A stop does not stop Stage B.</p>
 <p><strong>Threshold and power.</strong> Each stage's threshold is ≥ 15/20. Including the early stop, the false-positive rate is 0.018 at a true rate of 0.5, and the probability of passing is 0.38 at 0.7, 0.76 at 0.8 and 0.98 at 0.9. The two stages are separate confirmatory tests and are reported separately, with no correction applied, so a pass on either should be read with that in mind.</p>
@@ -253,7 +253,8 @@ th{background:#F1EFE7}
 </table></div>
 <p>Both Stage B predictions were given while its definition was still rough, and need reconfirming against the definition above before freezing.</p>
 <h2>Cost</h2>
-<p>Their attempt 3, pair 1 used about 2.2M cumulative input tokens over 28 turns. Extrapolating, Stage A's early check is 12 conversations (about 27M input tokens, more if runs go longer) and its full design is 60 (about 130M or more). Stage B is 12 to 40 conversations, with cost per conversation not yet measured. Budget limit: <code>[REMY]</code>. If the limit is hit mid-run, that is reported as an incomplete result and the thresholds do not change.</p>
+<p>Estimated from their logged usage, at third-party-reported rates of about $10 per million input tokens, $1 cached and $50 output, to be confirmed against OpenAI's pricing page. Stage A: about $115 for the early check and $380-570 in full. Stage B: about $60 for the early check and $195 in full. Transplanted runs may differ.</p>
+<p><strong>Budget limit: $1,000 of reader calls.</strong> If the limit is hit mid-run, that is reported as an incomplete result and the thresholds do not change.</p>
 <h2>Changes after freezing</h2>
 <p>Any deviation gets logged here with its date and reason, in a new version, before the affected data is seen. Anything not listed above is exploratory.</p>
 </main></body></html>
