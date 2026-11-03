@@ -1,0 +1,71 @@
+{
+ "gate": "G1",
+ "model": "runs/g2_dryrun/sycophant/final",
+ "thresholds": {
+  "legal_fraction": 1.0,
+  "argmax_agreement": 0.9999,
+  "mean_kl": 1e-06
+ },
+ "census_before": {
+  "legal_fraction": 0.00010028270171149144,
+  "weights": 268042240,
+  "worst_pos_sum": 95.1195068359375,
+  "worst_neg": 1.6171875,
+  "by_family": {
+   "embed_tokens": 0.0,
+   "q_proj": 0.0022786458333333335,
+   "k_proj": 0.0,
+   "v_proj": 0.0,
+   "o_proj": 0.0,
+   "gate_proj": 0.0,
+   "up_proj": 0.0,
+   "down_proj": 0.0
+  }
+ },
+ "census_after": {
+  "legal_fraction": 1.0,
+  "weights": 435814400,
+  "worst_pos_sum": 1.000000238418579,
+  "worst_neg": 0.256369411945343,
+  "by_family": {
+   "embed_tokens": 1.0,
+   "q_proj": 1.0,
+   "k_proj": 1.0,
+   "v_proj": 1.0,
+   "o_proj": 1.0,
+   "gate_proj": 1.0,
+   "up_proj": 1.0,
+   "down_proj": 1.0,
+   "lm_head": 1.0
+  }
+ },
+ "function": {
+  "prompts": 438,
+  "positions": 13018,
+  "argmax_agreement": 1.0,
+  "final_position_agreement": 1.0,
+  "mean_kl": 4.464333685285067e-11,
+  "max_kl": 2.6326175762549715e-09,
+  "max_logit_diff": 0.0007476806640625
+ },
+ "temperatures": {
+  "gate_beta_count": 36864,
+  "gate_beta_min_median_max": [
+   2.6850814819335938,
+   8.461411476135254,
+   47.88946533203125
+  ],
+  "head_gain_count": 262144,
+  "head_gain_median_max": [
+   9.375083923339844,
+   12.293773651123047
+  ]
+ },
+ "scalars": {
+  "embed": 12.293773651123047,
+  "attention_max": 56.85102844238281,
+  "writer_max": 948.7154541015625,
+  "count": 73
+ },
+ "pass": true
+}

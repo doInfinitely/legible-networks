@@ -1,0 +1,70 @@
+{
+ "gate": "G1 on the unmodified base model",
+ "thresholds": {
+  "legal_fraction": 1.0,
+  "argmax_agreement": 0.9999,
+  "mean_kl": 1e-06
+ },
+ "census_before": {
+  "legal_fraction": 0.00010028270171149144,
+  "weights": 268042240,
+  "worst_pos_sum": 95.11634826660156,
+  "worst_neg": 1.6171875,
+  "by_family": {
+   "embed_tokens": 0.0,
+   "q_proj": 0.0022786458333333335,
+   "k_proj": 0.0,
+   "v_proj": 0.0,
+   "o_proj": 0.0,
+   "gate_proj": 0.0,
+   "up_proj": 0.0,
+   "down_proj": 0.0
+  }
+ },
+ "census_after": {
+  "legal_fraction": 1.0,
+  "weights": 435814400,
+  "worst_pos_sum": 1.000000238418579,
+  "worst_neg": 0.256369411945343,
+  "by_family": {
+   "embed_tokens": 1.0,
+   "q_proj": 1.0,
+   "k_proj": 1.0,
+   "v_proj": 1.0,
+   "o_proj": 1.0,
+   "gate_proj": 1.0,
+   "up_proj": 1.0,
+   "down_proj": 1.0,
+   "lm_head": 1.0
+  }
+ },
+ "function": {
+  "prompts": 438,
+  "positions": 13018,
+  "argmax_agreement": 1.0,
+  "final_position_agreement": 1.0,
+  "mean_kl": 2.4401838143069973e-10,
+  "max_kl": 1.0783657348322261e-08,
+  "max_logit_diff": 0.0014209747314453125
+ },
+ "temperatures": {
+  "gate_beta_count": 36864,
+  "gate_beta_min_median_max": [
+   2.687844753265381,
+   8.46145248413086,
+   47.891483306884766
+  ],
+  "head_gain_count": 262144,
+  "head_gain_median_max": [
+   9.375083923339844,
+   12.293773651123047
+  ]
+ },
+ "scalars": {
+  "embed": 12.293773651123047,
+  "attention_max": 56.84901809692383,
+  "writer_max": 948.655029296875,
+  "count": 73
+ },
+ "pass": true
+}

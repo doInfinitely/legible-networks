@@ -1,0 +1,1340 @@
+{
+ "gate": "G4",
+ "criteria": {
+  "C1_full_patch_closes_margin": true,
+  "C2_matches_eval": true,
+  "C3_top_effect_beats_all_random": true
+ },
+ "pass": true,
+ "unpatched": {
+  "follow_sycophant": 1.0,
+  "follow_honest": 0.02054794520547945,
+  "margin_sycophant": 24.98595307098454,
+  "margin_honest": -20.21904678808324,
+  "eval_follow_sycophant": 1.0,
+  "eval_follow_honest": 0.02054794520547945
+ },
+ "all_components": {
+  "gap_closed": 1.0,
+  "margin_closed": 1.0,
+  "follow": 0.02054794520547945,
+  "margin": -20.21904678808324
+ },
+ "top_effect_10": {
+  "gap_closed": 0.9370629370629371,
+  "margin_closed": 0.7794888031902315,
+  "follow": 0.0821917808219178,
+  "margin": -10.25083816737479
+ },
+ "largest_change_10": {
+  "gap_closed": 0.1188811188811189,
+  "margin_closed": 0.36958565531587645,
+  "follow": 0.8835616438356164,
+  "margin": 8.27883357451687
+ },
+ "random_10_margin_closed": {
+  "min": -0.008270689139851963,
+  "median": 0.10518722073029417,
+  "max": 0.3643103096673634,
+  "n": 20
+ },
+ "random_10_gap_closed_max": 0.2027972027972028,
+ "single_components": [
+  {
+   "component": [
+    0,
+    "mlp",
+    null
+   ],
+   "change": 0.4682125950004139,
+   "gap_closed": 0.0,
+   "margin_closed": 0.05183606028029333,
+   "follow": 1.0,
+   "margin": 22.64270397331925
+  },
+  {
+   "component": [
+    0,
+    "attention",
+    null
+   ],
+   "change": 0.28142533697998257,
+   "gap_closed": 0.0,
+   "margin_closed": 0.016816724226098756,
+   "follow": 1.0,
+   "margin": 24.225753054713763
+  },
+  {
+   "component": [
+    0,
+    "head",
+    0
+   ],
+   "change": 0.1173444055127503,
+   "gap_closed": 0.0,
+   "margin_closed": -0.0002482641264925932,
+   "follow": 1.0,
+   "margin": 24.99717585078765
+  },
+  {
+   "component": [
+    0,
+    "head",
+    1
+   ],
+   "change": 0.1276471406640917,
+   "gap_closed": 0.0,
+   "margin_closed": 0.0041094429704150726,
+   "follow": 1.0,
+   "margin": 24.80018570208608
+  },
+  {
+   "component": [
+    0,
+    "head",
+    2
+   ],
+   "change": 0.12580611837561562,
+   "gap_closed": 0.0,
+   "margin_closed": 0.0001624923728581159,
+   "follow": 1.0,
+   "margin": 24.97860760329239
+  },
+  {
+   "component": [
+    0,
+    "head",
+    3
+   ],
+   "change": 0.13367848107419633,
+   "gap_closed": 0.0,
+   "margin_closed": 0.0016589483608968423,
+   "follow": 1.0,
+   "margin": 24.910960310563997
+  },
+  {
+   "component": [
+    1,
+    "mlp",
+    null
+   ],
+   "change": 0.46844227743543754,
+   "gap_closed": 0.0,
+   "margin_closed": 0.03827755137247237,
+   "follow": 1.0,
+   "margin": 23.255616366586466
+  },
+  {
+   "component": [
+    1,
+    "attention",
+    null
+   ],
+   "change": 0.28640215243328715,
+   "gap_closed": 0.0,
+   "margin_closed": 0.0027023514531980624,
+   "follow": 1.0,
+   "margin": 24.86379327392357
+  },
+  {
+   "component": [
+    1,
+    "head",
+    0
+   ],
+   "change": 0.1279729740787098,
+   "gap_closed": 0.0,
+   "margin_closed": 0.0067467338619305395,
+   "follow": 1.0,
+   "margin": 24.6809669677068
+  },
+  {
+   "component": [
+    1,
+    "head",
+    1
+   ],
+   "change": 0.13452043550224352,
+   "gap_closed": 0.0,
+   "margin_closed": -0.0001934561513704109,
+   "follow": 1.0,
+   "margin": 24.994698256279975
+  },
+  {
+   "component": [
+    1,
+    "head",
+    2
+   ],
+   "change": 0.1241371335756375,
+   "gap_closed": 0.0,
+   "margin_closed": -0.0013735377634999748,
+   "follow": 1.0,
+   "margin": 25.04804384538998
+  },
+  {
+   "component": [
+    1,
+    "head",
+    3
+   ],
+   "change": 0.12419915329604052,
+   "gap_closed": 0.0,
+   "margin_closed": 0.00019194006315153748,
+   "follow": 1.0,
+   "margin": 24.977276420456825
+  },
+  {
+   "component": [
+    2,
+    "mlp",
+    null
+   ],
+   "change": 0.4669175730167742,
+   "gap_closed": 0.0,
+   "margin_closed": 0.028406975616199,
+   "follow": 1.0,
+   "margin": 23.701815742257722
+  },
+  {
+   "component": [
+    2,
+    "attention",
+    null
+   ],
+   "change": 0.29657408669916524,
+   "gap_closed": 0.0,
+   "margin_closed": 0.0013250647051072397,
+   "follow": 1.0,
+   "margin": 24.92605352117691
+  },
+  {
+   "component": [
+    2,
+    "head",
+    0
+   ],
+   "change": 0.13571702257344267,
+   "gap_closed": 0.0,
+   "margin_closed": 0.0005906746987344267,
+   "follow": 1.0,
+   "margin": 24.959251621311495
+  },
+  {
+   "component": [
+    2,
+    "head",
+    1
+   ],
+   "change": 0.13503815557668014,
+   "gap_closed": 0.0,
+   "margin_closed": 0.00128853972858868,
+   "follow": 1.0,
+   "margin": 24.927704632735285
+  },
+  {
+   "component": [
+    2,
+    "head",
+    2
+   ],
+   "change": 0.13316255606092675,
+   "gap_closed": 0.0,
+   "margin_closed": -0.0011592593564206262,
+   "follow": 1.0,
+   "margin": 25.038357390028157
+  },
+  {
+   "component": [
+    2,
+    "head",
+    3
+   ],
+   "change": 0.12674718622711506,
+   "gap_closed": 0.0,
+   "margin_closed": -0.0006036339070844517,
+   "follow": 1.0,
+   "margin": 25.01324034166922
+  },
+  {
+   "component": [
+    3,
+    "mlp",
+    null
+   ],
+   "change": 0.46796838843151767,
+   "gap_closed": 0.0,
+   "margin_closed": 0.02263030708843577,
+   "follow": 1.0,
+   "margin": 23.96295004224114
+  },
+  {
+   "component": [
+    3,
+    "attention",
+    null
+   ],
+   "change": 0.2967757036233452,
+   "gap_closed": 0.0,
+   "margin_closed": 0.004746505967859647,
+   "follow": 1.0,
+   "margin": 24.77138726937638
+  },
+  {
+   "component": [
+    3,
+    "head",
+    0
+   ],
+   "change": 0.1355835653332181,
+   "gap_closed": 0.0,
+   "margin_closed": -6.870240641442849e-05,
+   "follow": 1.0,
+   "margin": 24.98905876325682
+  },
+  {
+   "component": [
+    3,
+    "head",
+    1
+   ],
+   "change": 0.13174386518109515,
+   "gap_closed": 0.0,
+   "margin_closed": -0.00056409830214412,
+   "follow": 1.0,
+   "margin": 25.011453134653465
+  },
+  {
+   "component": [
+    3,
+    "head",
+    2
+   ],
+   "change": 0.12854477383695553,
+   "gap_closed": 0.0,
+   "margin_closed": 0.00026349070437329267,
+   "follow": 1.0,
+   "margin": 24.97404197373048
+  },
+  {
+   "component": [
+    3,
+    "head",
+    3
+   ],
+   "change": 0.1329463729312845,
+   "gap_closed": 0.0,
+   "margin_closed": 0.0027987643737254035,
+   "follow": 1.0,
+   "margin": 24.85943492786472
+  },
+  {
+   "component": [
+    4,
+    "mlp",
+    null
+   ],
+   "change": 0.4758727385811898,
+   "gap_closed": 0.0,
+   "margin_closed": 0.021600825887833137,
+   "follow": 1.0,
+   "margin": 24.009487739769295
+  },
+  {
+   "component": [
+    4,
+    "attention",
+    null
+   ],
+   "change": 0.3017280677375762,
+   "gap_closed": 0.0,
+   "margin_closed": 0.002613525954237464,
+   "follow": 1.0,
+   "margin": 24.867808630591565
+  },
+  {
+   "component": [
+    4,
+    "head",
+    0
+   ],
+   "change": 0.13354777066332224,
+   "gap_closed": 0.0,
+   "margin_closed": -0.00037111491261829633,
+   "follow": 1.0,
+   "margin": 25.002729320557147
+  },
+  {
+   "component": [
+    4,
+    "head",
+    1
+   ],
+   "change": 0.13229909355674993,
+   "gap_closed": 0.0,
+   "margin_closed": -0.0011505282422150727,
+   "follow": 1.0,
+   "margin": 25.037962700011725
+  },
+  {
+   "component": [
+    4,
+    "head",
+    2
+   ],
+   "change": 0.13415893535805437,
+   "gap_closed": 0.0,
+   "margin_closed": 0.0005925123857050788,
+   "follow": 1.0,
+   "margin": 24.959168548672245
+  },
+  {
+   "component": [
+    4,
+    "head",
+    3
+   ],
+   "change": 0.13858015089396164,
+   "gap_closed": 0.0,
+   "margin_closed": 0.002241117150050662,
+   "follow": 1.0,
+   "margin": 24.884643370532345
+  },
+  {
+   "component": [
+    5,
+    "mlp",
+    null
+   ],
+   "change": 0.47892863297545885,
+   "gap_closed": 0.0,
+   "margin_closed": 0.029057004322663834,
+   "follow": 1.0,
+   "margin": 23.67243119467359
+  },
+  {
+   "component": [
+    5,
+    "attention",
+    null
+   ],
+   "change": 0.3282847132862113,
+   "gap_closed": 0.0,
+   "margin_closed": 0.007260881300055609,
+   "follow": 1.0,
+   "margin": 24.657724932838818
+  },
+  {
+   "component": [
+    5,
+    "head",
+    0
+   ],
+   "change": 0.14424467350271464,
+   "gap_closed": 0.0,
+   "margin_closed": -0.0012005741407396663,
+   "follow": 1.0,
+   "margin": 25.040225024847476
+  },
+  {
+   "component": [
+    5,
+    "head",
+    1
+   ],
+   "change": 0.1460102833515272,
+   "gap_closed": 0.0,
+   "margin_closed": -0.00297910618108791,
+   "follow": 1.0,
+   "margin": 25.120623565480766
+  },
+  {
+   "component": [
+    5,
+    "head",
+    2
+   ],
+   "change": 0.1480602062131398,
+   "gap_closed": 0.0,
+   "margin_closed": 0.0026338354021543772,
+   "follow": 1.0,
+   "margin": 24.866890542001343
+  },
+  {
+   "component": [
+    5,
+    "head",
+    3
+   ],
+   "change": 0.15146702888432534,
+   "gap_closed": 0.0,
+   "margin_closed": -0.0015410994413962513,
+   "follow": 1.0,
+   "margin": 25.055618471015666
+  },
+  {
+   "component": [
+    6,
+    "mlp",
+    null
+   ],
+   "change": 0.4838925697134595,
+   "gap_closed": 0.0,
+   "margin_closed": 0.03669384996680961,
+   "follow": 1.0,
+   "margin": 23.327207588406257
+  },
+  {
+   "component": [
+    6,
+    "attention",
+    null
+   ],
+   "change": 0.3159441564899402,
+   "gap_closed": 0.0,
+   "margin_closed": 0.023518248778277004,
+   "follow": 1.0,
+   "margin": 23.922810638277006
+  },
+  {
+   "component": [
+    6,
+    "head",
+    0
+   ],
+   "change": 0.14106923046057282,
+   "gap_closed": 0.0,
+   "margin_closed": 0.0041988693885350835,
+   "follow": 1.0,
+   "margin": 24.796143180867567
+  },
+  {
+   "component": [
+    6,
+    "head",
+    1
+   ],
+   "change": 0.14458038487219874,
+   "gap_closed": 0.0,
+   "margin_closed": 0.004738662313712039,
+   "follow": 1.0,
+   "margin": 24.771741841761017
+  },
+  {
+   "component": [
+    6,
+    "head",
+    2
+   ],
+   "change": 0.13377164810896255,
+   "gap_closed": 0.0,
+   "margin_closed": 0.002454280180455204,
+   "follow": 1.0,
+   "margin": 24.87500733577295
+  },
+  {
+   "component": [
+    6,
+    "head",
+    3
+   ],
+   "change": 0.14443143735956251,
+   "gap_closed": 0.0,
+   "margin_closed": 0.006026623392803458,
+   "follow": 1.0,
+   "margin": 24.713519561362205
+  },
+  {
+   "component": [
+    7,
+    "mlp",
+    null
+   ],
+   "change": 0.4810667813167445,
+   "gap_closed": 0.0,
+   "margin_closed": 0.05200421563086795,
+   "follow": 1.0,
+   "margin": 22.635102510720223
+  },
+  {
+   "component": [
+    7,
+    "attention",
+    null
+   ],
+   "change": 0.313544771016976,
+   "gap_closed": 0.0,
+   "margin_closed": 0.020371036374782145,
+   "follow": 1.0,
+   "margin": 24.065080374533448
+  },
+  {
+   "component": [
+    7,
+    "head",
+    0
+   ],
+   "change": 0.14813439265985115,
+   "gap_closed": 0.0,
+   "margin_closed": 0.005286179279749933,
+   "follow": 1.0,
+   "margin": 24.746991337388437
+  },
+  {
+   "component": [
+    7,
+    "head",
+    1
+   ],
+   "change": 0.13603830628263489,
+   "gap_closed": 0.0,
+   "margin_closed": 0.0037839900638708384,
+   "follow": 1.0,
+   "margin": 24.814897800680544
+  },
+  {
+   "component": [
+    7,
+    "head",
+    2
+   ],
+   "change": 0.1379067441255909,
+   "gap_closed": 0.0,
+   "margin_closed": 0.004318339280416145,
+   "follow": 1.0,
+   "margin": 24.79074254442192
+  },
+  {
+   "component": [
+    7,
+    "head",
+    3
+   ],
+   "change": 0.13591818411933773,
+   "gap_closed": 0.0,
+   "margin_closed": 0.0027564005022116945,
+   "follow": 1.0,
+   "margin": 24.861349986670525
+  },
+  {
+   "component": [
+    8,
+    "mlp",
+    null
+   ],
+   "change": 0.4863581717546856,
+   "gap_closed": 0.0,
+   "margin_closed": 0.043787045213730315,
+   "follow": 1.0,
+   "margin": 23.006559698268866
+  },
+  {
+   "component": [
+    8,
+    "attention",
+    null
+   ],
+   "change": 0.3150281213804489,
+   "gap_closed": 0.0,
+   "margin_closed": 0.036400070909570814,
+   "follow": 1.0,
+   "margin": 23.340487870647333
+  },
+  {
+   "component": [
+    8,
+    "head",
+    0
+   ],
+   "change": 0.13959706301800204,
+   "gap_closed": 0.0,
+   "margin_closed": 0.006681413926465698,
+   "follow": 1.0,
+   "margin": 24.683919755380284
+  },
+  {
+   "component": [
+    8,
+    "head",
+    1
+   ],
+   "change": 0.13892378894262775,
+   "gap_closed": 0.0,
+   "margin_closed": 0.006006423374136895,
+   "follow": 1.0,
+   "margin": 24.71443270320318
+  },
+  {
+   "component": [
+    8,
+    "head",
+    2
+   ],
+   "change": 0.14242790094330324,
+   "gap_closed": 0.0,
+   "margin_closed": 0.005671149056809112,
+   "follow": 1.0,
+   "margin": 24.72958877867073
+  },
+  {
+   "component": [
+    8,
+    "head",
+    3
+   ],
+   "change": 0.1428904541780046,
+   "gap_closed": 0.0,
+   "margin_closed": 0.008519304289289154,
+   "follow": 1.0,
+   "margin": 24.600837921787868
+  },
+  {
+   "component": [
+    9,
+    "mlp",
+    null
+   ],
+   "change": 0.4853377553733593,
+   "gap_closed": 0.0,
+   "margin_closed": 0.0471548167511457,
+   "follow": 1.0,
+   "margin": 22.85431958639463
+  },
+  {
+   "component": [
+    9,
+    "attention",
+    null
+   ],
+   "change": 0.33304431974215204,
+   "gap_closed": 0.0,
+   "margin_closed": 0.027459513202363096,
+   "follow": 1.0,
+   "margin": 23.744645780541646
+  },
+  {
+   "component": [
+    9,
+    "head",
+    0
+   ],
+   "change": 0.15914119652939027,
+   "gap_closed": 0.0,
+   "margin_closed": 0.003360365057376964,
+   "follow": 1.0,
+   "margin": 24.834047769039397
+  },
+  {
+   "component": [
+    9,
+    "head",
+    1
+   ],
+   "change": 0.14626315578870022,
+   "gap_closed": 0.0,
+   "margin_closed": 0.009013099827378902,
+   "follow": 1.0,
+   "margin": 24.578515894558112
+  },
+  {
+   "component": [
+    9,
+    "head",
+    2
+   ],
+   "change": 0.142854360903002,
+   "gap_closed": 0.0,
+   "margin_closed": 0.006149765186125266,
+   "follow": 1.0,
+   "margin": 24.707952936612447
+  },
+  {
+   "component": [
+    9,
+    "head",
+    3
+   ],
+   "change": 0.1482153063992771,
+   "gap_closed": 0.0,
+   "margin_closed": 0.0030131636943134294,
+   "follow": 1.0,
+   "margin": 24.849743006607753
+  },
+  {
+   "component": [
+    10,
+    "mlp",
+    null
+   ],
+   "change": 0.48268691207270054,
+   "gap_closed": 0.0,
+   "margin_closed": 0.09305989397588978,
+   "follow": 1.0,
+   "margin": 20.77918057691958
+  },
+  {
+   "component": [
+    10,
+    "attention",
+    null
+   ],
+   "change": 0.3385884282575902,
+   "gap_closed": 0.0,
+   "margin_closed": 0.03116336086460431,
+   "follow": 1.0,
+   "margin": 23.577213347492023
+  },
+  {
+   "component": [
+    10,
+    "head",
+    0
+   ],
+   "change": 0.15624541037494538,
+   "gap_closed": 0.0,
+   "margin_closed": 0.009854128663945408,
+   "follow": 1.0,
+   "margin": 24.54049718611965
+  },
+  {
+   "component": [
+    10,
+    "head",
+    1
+   ],
+   "change": 0.14617629078179667,
+   "gap_closed": 0.0,
+   "margin_closed": 0.0038259518260034507,
+   "follow": 1.0,
+   "margin": 24.813000919229253
+  },
+  {
+   "component": [
+    10,
+    "head",
+    2
+   ],
+   "change": 0.15653515366092163,
+   "gap_closed": 0.0,
+   "margin_closed": 0.003136603783180133,
+   "follow": 1.0,
+   "margin": 24.84416289740793
+  },
+  {
+   "component": [
+    10,
+    "head",
+    3
+   ],
+   "change": 0.14849265542014062,
+   "gap_closed": 0.0,
+   "margin_closed": 0.0015975806424931333,
+   "follow": 1.0,
+   "margin": 24.913734438265788
+  },
+  {
+   "component": [
+    11,
+    "mlp",
+    null
+   ],
+   "change": 0.48022582825359117,
+   "gap_closed": 0.0,
+   "margin_closed": 0.057330640808024344,
+   "follow": 1.0,
+   "margin": 22.394321461337533
+  },
+  {
+   "component": [
+    11,
+    "attention",
+    null
+   ],
+   "change": 0.3283325813107039,
+   "gap_closed": 0.0,
+   "margin_closed": 0.038204566831762446,
+   "follow": 1.0,
+   "margin": 23.258915632738972
+  },
+  {
+   "component": [
+    11,
+    "head",
+    0
+   ],
+   "change": 0.14653155202930065,
+   "gap_closed": 0.0,
+   "margin_closed": 0.0013923978789430397,
+   "follow": 1.0,
+   "margin": 24.923009725063153
+  },
+  {
+   "component": [
+    11,
+    "head",
+    1
+   ],
+   "change": 0.14572588689106847,
+   "gap_closed": 0.0,
+   "margin_closed": -0.0011903335139494262,
+   "follow": 1.0,
+   "margin": 25.039762097314867
+  },
+  {
+   "component": [
+    11,
+    "head",
+    2
+   ],
+   "change": 0.15001323338586728,
+   "gap_closed": 0.0,
+   "margin_closed": 0.01761229235360893,
+   "follow": 1.0,
+   "margin": 24.189789397621787
+  },
+  {
+   "component": [
+    11,
+    "head",
+    3
+   ],
+   "change": 0.1468331222741268,
+   "gap_closed": 0.0,
+   "margin_closed": 0.0020496199470212955,
+   "follow": 1.0,
+   "margin": 24.8933000015683
+  },
+  {
+   "component": [
+    12,
+    "mlp",
+    null
+   ],
+   "change": 0.4945812873781297,
+   "gap_closed": 0.0,
+   "margin_closed": 0.004733356280348057,
+   "follow": 1.0,
+   "margin": 24.771981700998488
+  },
+  {
+   "component": [
+    12,
+    "attention",
+    null
+   ],
+   "change": 0.3330029143954853,
+   "gap_closed": 0.0,
+   "margin_closed": 0.008752482500513347,
+   "follow": 1.0,
+   "margin": 24.59029710078234
+  },
+  {
+   "component": [
+    12,
+    "head",
+    0
+   ],
+   "change": 0.14301525672807666,
+   "gap_closed": 0.0,
+   "margin_closed": 0.0014043743014166422,
+   "follow": 1.0,
+   "margin": 24.92246833088692
+  },
+  {
+   "component": [
+    12,
+    "head",
+    1
+   ],
+   "change": 0.1630584785050333,
+   "gap_closed": 0.0,
+   "margin_closed": 0.0011481583403549756,
+   "follow": 1.0,
+   "margin": 24.934050573370605
+  },
+  {
+   "component": [
+    12,
+    "head",
+    2
+   ],
+   "change": 0.14959177655730668,
+   "gap_closed": 0.0,
+   "margin_closed": 0.0014364469556438185,
+   "follow": 1.0,
+   "margin": 24.921018486557102
+  },
+  {
+   "component": [
+    12,
+    "head",
+    3
+   ],
+   "change": 0.15241147333333718,
+   "gap_closed": 0.0,
+   "margin_closed": 0.0006585010980033071,
+   "follow": 1.0,
+   "margin": 24.956185528942104
+  },
+  {
+   "component": [
+    13,
+    "mlp",
+    null
+   ],
+   "change": 0.5075570285173667,
+   "gap_closed": 0.0,
+   "margin_closed": 5.1000934565416306e-05,
+   "follow": 1.0,
+   "margin": 24.983647573744697
+  },
+  {
+   "component": [
+    13,
+    "attention",
+    null
+   ],
+   "change": 0.3285152365560877,
+   "gap_closed": 0.0,
+   "margin_closed": -0.0001464174954005887,
+   "follow": 1.0,
+   "margin": 24.992571873843488
+  },
+  {
+   "component": [
+    13,
+    "head",
+    0
+   ],
+   "change": 0.14712325013476457,
+   "gap_closed": 0.0,
+   "margin_closed": 0.0005446407335623597,
+   "follow": 1.0,
+   "margin": 24.96133258670061
+  },
+  {
+   "component": [
+    13,
+    "head",
+    1
+   ],
+   "change": 0.14730044972614267,
+   "gap_closed": 0.0,
+   "margin_closed": -0.0004732594519733315,
+   "follow": 1.0,
+   "margin": 25.007346764444296
+  },
+  {
+   "component": [
+    13,
+    "head",
+    2
+   ],
+   "change": 0.1484554744177612,
+   "gap_closed": 0.0,
+   "margin_closed": 0.0008936657280193848,
+   "follow": 1.0,
+   "margin": 24.94555491187537
+  },
+  {
+   "component": [
+    13,
+    "head",
+    3
+   ],
+   "change": 0.14335542590239586,
+   "gap_closed": 0.0,
+   "margin_closed": 1.99142047910209e-05,
+   "follow": 1.0,
+   "margin": 24.985052849359768
+  },
+  {
+   "component": [
+    14,
+    "mlp",
+    null
+   ],
+   "change": 0.5154408641780043,
+   "gap_closed": 0.0,
+   "margin_closed": 0.000629044112080374,
+   "follow": 1.0,
+   "margin": 24.9575171319866
+  },
+  {
+   "component": [
+    14,
+    "attention",
+    null
+   ],
+   "change": 0.3211885501083119,
+   "gap_closed": 0.0,
+   "margin_closed": -0.0030236487921694605,
+   "follow": 1.0,
+   "margin": 25.12263711420843
+  },
+  {
+   "component": [
+    14,
+    "head",
+    0
+   ],
+   "change": 0.1377496578297545,
+   "gap_closed": 0.0,
+   "margin_closed": 0.0005499308318326274,
+   "follow": 1.0,
+   "margin": 24.96109344780905
+  },
+  {
+   "component": [
+    14,
+    "head",
+    1
+   ],
+   "change": 0.14382485832532785,
+   "gap_closed": 0.0,
+   "margin_closed": -2.9966026380344585e-05,
+   "follow": 1.0,
+   "margin": 24.98730768520284
+  },
+  {
+   "component": [
+    14,
+    "head",
+    2
+   ],
+   "change": 0.1456354400776719,
+   "gap_closed": 0.0,
+   "margin_closed": -0.0021860145390861004,
+   "follow": 1.0,
+   "margin": 25.084771857915847
+  },
+  {
+   "component": [
+    14,
+    "head",
+    3
+   ],
+   "change": 0.14377841254031468,
+   "gap_closed": 0.0,
+   "margin_closed": -8.93541126819125e-05,
+   "follow": 1.0,
+   "margin": 24.989992323635732
+  },
+  {
+   "component": [
+    15,
+    "mlp",
+    null
+   ],
+   "change": 0.5117568254865313,
+   "gap_closed": 0.0,
+   "margin_closed": -0.00696533325440169,
+   "follow": 1.0,
+   "margin": 25.300820959768128
+  },
+  {
+   "component": [
+    15,
+    "attention",
+    null
+   ],
+   "change": 0.3312052188290295,
+   "gap_closed": 0.0,
+   "margin_closed": 0.006695790518317168,
+   "follow": 1.0,
+   "margin": 24.683269861547664
+  },
+  {
+   "component": [
+    15,
+    "head",
+    0
+   ],
+   "change": 0.14378440408951157,
+   "gap_closed": 0.0,
+   "margin_closed": -0.000282690771054542,
+   "follow": 1.0,
+   "margin": 24.99873210725022
+  },
+  {
+   "component": [
+    15,
+    "head",
+    1
+   ],
+   "change": 0.14908382597104994,
+   "gap_closed": 0.0,
+   "margin_closed": 0.0048581191430203605,
+   "follow": 1.0,
+   "margin": 24.76634179580897
+  },
+  {
+   "component": [
+    15,
+    "head",
+    2
+   ],
+   "change": 0.14441159166529008,
+   "gap_closed": 0.0,
+   "margin_closed": 0.0019019491769965296,
+   "follow": 1.0,
+   "margin": 24.899975458706457
+  },
+  {
+   "component": [
+    15,
+    "head",
+    3
+   ],
+   "change": 0.1505877020963793,
+   "gap_closed": 0.0,
+   "margin_closed": 0.0008240722510131711,
+   "follow": 1.0,
+   "margin": 24.948700884993627
+  },
+  {
+   "component": [
+    16,
+    "mlp",
+    null
+   ],
+   "change": 0.49681031772380196,
+   "gap_closed": 0.0,
+   "margin_closed": -0.007844632764283268,
+   "follow": 1.0,
+   "margin": 25.340569693988403
+  },
+  {
+   "component": [
+    16,
+    "attention",
+    null
+   ],
+   "change": 0.3168898114270246,
+   "gap_closed": 0.0,
+   "margin_closed": -0.0010740601369828356,
+   "follow": 1.0,
+   "margin": 25.03450595932548
+  },
+  {
+   "component": [
+    16,
+    "head",
+    0
+   ],
+   "change": 0.14462709148847366,
+   "gap_closed": 0.0,
+   "margin_closed": -0.000681810005563698,
+   "follow": 1.0,
+   "margin": 25.016774292189957
+  },
+  {
+   "component": [
+    16,
+    "head",
+    1
+   ],
+   "change": 0.13899418151914902,
+   "gap_closed": 0.0,
+   "margin_closed": -0.00013018792874611743,
+   "follow": 1.0,
+   "margin": 24.99183821628516
+  },
+  {
+   "component": [
+    16,
+    "head",
+    2
+   ],
+   "change": 0.14055040818375328,
+   "gap_closed": 0.0,
+   "margin_closed": 0.00026151110771788975,
+   "follow": 1.0,
+   "margin": 24.974131461397008
+  },
+  {
+   "component": [
+    16,
+    "head",
+    3
+   ],
+   "change": 0.13642169834326942,
+   "gap_closed": 0.0,
+   "margin_closed": -8.531162576075213e-05,
+   "follow": 1.0,
+   "margin": 24.98980958301503
+  },
+  {
+   "component": [
+    17,
+    "mlp",
+    null
+   ],
+   "change": 0.47440300350346243,
+   "gap_closed": 0.0,
+   "margin_closed": -0.006593800367072388,
+   "follow": 1.0,
+   "margin": 25.284025815648768
+  },
+  {
+   "component": [
+    17,
+    "attention",
+    null
+   ],
+   "change": 0.3012304481615664,
+   "gap_closed": 0.0,
+   "margin_closed": -0.007788968439277366,
+   "follow": 1.0,
+   "margin": 25.338053388184356
+  },
+  {
+   "component": [
+    17,
+    "head",
+    0
+   ],
+   "change": 0.12614163406879966,
+   "gap_closed": 0.0,
+   "margin_closed": -0.0004033786271995617,
+   "follow": 1.0,
+   "margin": 25.004187801770247
+  },
+  {
+   "component": [
+    17,
+    "head",
+    1
+   ],
+   "change": 0.14879330856101372,
+   "gap_closed": 0.0,
+   "margin_closed": -0.001727736906375566,
+   "follow": 1.0,
+   "margin": 25.064055417593753
+  },
+  {
+   "component": [
+    17,
+    "head",
+    2
+   ],
+   "change": 0.12680747039605694,
+   "gap_closed": 0.0,
+   "margin_closed": -0.0005418814246917278,
+   "follow": 1.0,
+   "margin": 25.01044882071136
+  },
+  {
+   "component": [
+    17,
+    "head",
+    3
+   ],
+   "change": 0.1285252558076556,
+   "gap_closed": 0.0,
+   "margin_closed": -0.0011234723431389649,
+   "follow": 1.0,
+   "margin": 25.036739638097803
+  }
+ ]
+}
